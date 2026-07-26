@@ -24,21 +24,39 @@ from .skills.state import GraphState
 from .tools.registry import ToolRegistry
 
 
-CLASSIFY_SYSTEM = """你是意图分类器。判断用户问的是哪种意图。
-
-可选意图：
-{intent_list}
-
-返回 JSON：{{"intent": "<name>", "confidence": 0.0-1.0}}"""
-
-
 def _build_classifier(cfg: AgentConfig, llm):
     intents_desc = "\n".join(f"- {it.name}: {it.description}" for it in cfg.intents)
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", CLASSIFY_SYSTEM.format(intent_list=intents_desc)),
-        ("human", "{question}\n\n回答："),
-    ])
-    chain = prompt | llm | StrOutputParser()
+    # 不用 ChatPromptTemplate（langchain 会把 system 文本里的 {...} 当 input 变量），
+    # 直接拼 Runnable：input → [SystemMessage, HumanMessage] → llm → StrOutputParser
+    from langchain_core.messages import SystemMessage, HumanMessage
+    from langchain_core.runnables import RunnableLambda
+    from langchain_core.output_parsers import StrOutputParser
+
+    system_text = (
+        "你是意图分类器。判断用户问的是哪种意图。\n"
+        "可选意图：\n"
+        f"{intents_desc}\n"
+        "返回严格 JSON 格式（用英文双引号包裹 key 和 value），"
+        "结构：[key 名称], [value 类型]"
+    ).replace("[", "<<").replace("]", ">>")   # 临时替换避开 langchain 模板扫描
+    # 上面把 [...] 换成 <<...>> 是为了不在 system 文本里出现 {...} 模式
+    # 但实际答案中要 [...]; 在 chain 调用前再换回来
+    # 简化：直接用不含 {...} 的描述
+    system_text = (
+        "你是意图分类器。判断用户问的是哪种意图。\n"
+        "可选意图：\n"
+        f"{intents_desc}\n"
+        "请返回合法 JSON——键名 intent 表示选中的意图，键名 confidence 表示置信度（0-1 之间的小数），"
+        "两个键都用英文双引号包裹"
+    )
+    chain = (
+        RunnableLambda(lambda inp: [
+            SystemMessage(content=system_text),
+            HumanMessage(content=inp["question"]),
+        ])
+        | llm
+        | StrOutputParser()
+    )
 
     allowed = {it.name for it in cfg.intents}
 

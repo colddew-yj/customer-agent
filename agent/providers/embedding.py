@@ -21,6 +21,10 @@ def build_embedding(cfg: EmbeddingConfig) -> Embeddings:
     if cfg.provider == "ollama":
         from langchain_ollama import OllamaEmbeddings
         return OllamaEmbeddings(base_url=cfg.base_url or "http://localhost:11434", model=cfg.model)
+    if cfg.provider == "dashscope":
+        # 阿里云 DashScope（用 langchain_community wrapper；不依赖 base_url）
+        from langchain_community.embeddings import DashScopeEmbeddings
+        return DashScopeEmbeddings(model=cfg.model, dashscope_api_key=api_key)
     if cfg.provider == "fake":
         # 测试 / dev：deterministic random vector（无需 API key）
         from langchain_community.embeddings import FakeEmbeddings
