@@ -19,7 +19,6 @@ from langgraph.graph import END, START, StateGraph
 
 from .config import AgentConfig
 from .providers import build_embedding, build_llm, build_vector_store
-from .knowledge.retriever import build_hybrid_retriever
 from .skills.registry import build_handler
 from .skills.state import GraphState
 from .tools.registry import ToolRegistry
@@ -67,10 +66,15 @@ def build_graph(cfg: AgentConfig, checkpointer=None):
     llm = build_llm(cfg.llm)
     embedding = build_embedding(cfg.embedding)
     vector_store = build_vector_store(cfg.vector_store, embedding)
-    vector_retriever = vector_store.as_retriever(search_kwargs={"k": cfg.retriever.top_k})
 
-    bm25_chunks = []
-    retriever = build_hybrid_retriever(vector_retriever, bm25_chunks, cfg.retriever)
+    # V2: 按 retriever.strategy 路由（vector / hybrid / multiquery / hyde）
+    from .knowledge.build import build_retriever
+    retriever = build_retriever(
+        cfg=cfg.retriever,
+        vector_store=vector_store,
+        embedding=embedding,
+        llm=llm,
+    )
 
     tools = ToolRegistry(cfg.tools)
 

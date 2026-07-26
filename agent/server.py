@@ -124,6 +124,20 @@ async def ingest() -> dict:
     return stats
 
 
+class FeedbackRequest(BaseModel):
+    run_id: str
+    score: float = Field(..., ge=0, le=1)
+    comment: str = ""
+
+
+@app.post("/feedback")
+async def feedback(req: FeedbackRequest) -> dict:
+    """V2: 业务方把用户评分 / 反馈透传到 LangSmith run。"""
+    from .observability import push_feedback
+    ok = push_feedback(_cfg, req.run_id, req.score, req.comment)
+    return {"pushed": ok, "run_id": req.run_id}
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}

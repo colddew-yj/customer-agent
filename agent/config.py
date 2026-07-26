@@ -42,12 +42,23 @@ class VectorStoreConfig(BaseModel):
     collection_name: str = "knowledge"
 
 
+class MultiQueryConfig(BaseModel):
+    n_variants: int = 3
+
+
+class HydeConfig(BaseModel):
+    enabled: bool = False
+
+
 class RetrieverConfig(BaseModel):
+    strategy: str = "hybrid"               # vector | hybrid | multiquery | hyde
     top_k: int = 5
     fetch_k: int = 10
-    hybrid: bool = True
-    rerank: bool = False
-    bm25_tokenizer: str = "jieba"          # jieba | whitespace | custom
+    fusion: str = "rrf"                   # rrf | weighted
+    bm25_chunks_path: str = "./data/bm25_chunks.pkl"
+    bm25_tokenizer: str = "jieba"         # jieba | whitespace
+    multi_query: MultiQueryConfig = MultiQueryConfig()
+    hyde: HydeConfig = HydeConfig()
 
 
 class KnowledgeSourceConfig(BaseModel):
@@ -91,11 +102,20 @@ class ServerConfig(BaseModel):
     heartbeat_seconds: int = 15
 
 
+class EvaluationConfig(BaseModel):
+    enabled: bool = False
+    dataset_name: str | None = None
+    evaluators: list[str] = Field(default_factory=lambda: ["heuristic"])
+    # 哪些 strategies 对比（vector / hybrid / multiquery / hyde），输出 precision@k
+    strategies: list[str] = Field(default_factory=lambda: ["hybrid"])
+
+
 class LangSmithConfig(BaseModel):
     enabled: bool = False
     api_key_env: str = "LANGSMITH_API_KEY"
     project: str = "customer-agent"
-    local_trace_path: str | None = None     # 缺 LangSmith key 时本地 trace 落这里
+    local_trace_path: str | None = None
+    evaluation: EvaluationConfig = EvaluationConfig()
 
 
 class AgentConfig(BaseModel):

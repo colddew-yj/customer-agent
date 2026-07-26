@@ -81,3 +81,36 @@ def trace_run(cfg, run_name: str, **fields: Any) -> Iterator[dict]:
     finally:
         record["latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
         append_local_trace(cfg, record)
+
+
+# ─────────────────────────────────────────────────────────────────
+# V2: LangSmith Client + Feedback
+# ─────────────────────────────────────────────────────────────────
+
+def langsmith_client(cfg):
+    """返回 langsmith.Client（lazy import，缺包返 None）。"""
+    ls = cfg.langsmith
+    api_key = os.environ.get(ls.api_key_env, "").strip()
+    if not ls.enabled or not api_key:
+        return None
+    try:
+        from langsmith import Client
+        return Client(api_key=api_key, api_url="https://api.smith.langchain.com")
+    except ImportError:
+        return None
+
+
+def push_feedback(cfg, run_id: str, score: float, comment: str = "") -> bool:
+    """业务方 /feedback 端点用：把用户评分写回 LangSmith run。
+
+    返回 True 表示成功，False 表示 LangSmith 未启用 / 缺包 / 异常。
+    """
+    client = langsmith_client(cfg)
+    if client is None:
+        return False
+    try:
+        client.create_feedback(run_id=run_id, key="user_score", score=score, comment=comment)
+        return True
+    except Exception as e:                              # noqa: BLE001
+        print(f"[langsmith feedback] failed: {e}")
+        return False
