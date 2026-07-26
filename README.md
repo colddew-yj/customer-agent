@@ -13,7 +13,34 @@
 
 ## English
 
-A general-purpose customer service agent built on LangGraph + FastAPI. Configure your LLM provider, knowledge sources, intents, and business tools through a single `agent.yaml` — no code changes needed.
+A **general-purpose customer service agent** — one binary that adapts to many scenarios through configuration, not code changes.
+
+### What "general-purpose" means
+
+The same agent serves any customer service domain by swapping its `agent.yaml`:
+
+- **Retail / e-commerce** — FAQ on returns, refunds, shipping, inventory
+- **SaaS tech support** — API errors, SDK usage, rate-limit troubleshooting
+- **Banking / insurance** — account queries, policy lookup, complaint triage (all through your own APIs)
+- **Education / training** — curriculum Q&A, assignment help, scheduling
+- **Internal IT / HR** — leave policies, ticket routing, password resets
+- **Custom domains** — drop your knowledge files in, wire your APIs to `tools:`, define your intents
+
+The configuration is the product:
+
+| Concern | How to swap | Where |
+|---|---|---|
+| LLM provider | `llm.provider` (openai / anthropic / deepseek / ollama / azure) | `agent.yaml` |
+| Embedding model | `embedding.provider` + `embedding.model` | `agent.yaml` |
+| Knowledge sources | `connector: local / s3 / git / notion` per source | `agent.yaml` `knowledge.sources:` |
+| Document formats | `format: md / pdf / docx / xlsx / pdf_advanced / ...` per source | `agent.yaml` |
+| Retrieval strategy | `retriever.strategy: vector / hybrid / multiquery / hyde` | `agent.yaml` |
+| Intents (FAQ / account / complaint / ...) | `intents:` list with `builtin:*` or custom handler paths | `agent.yaml` |
+| Business APIs | `tools:` list with endpoint + auth + templates | `agent.yaml` |
+| Custom Python behavior | drop a `.py` file in `~/.customer-agent/handlers/` | filesystem |
+| Observability | `langsmith.enabled: true` + `LANGSMITH_API_KEY` | `agent.yaml` + env |
+
+No code changes. No rebuild. Edit YAML, restart, done.
 
 ### Why use customer-agent
 
@@ -211,12 +238,6 @@ const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId 
 - [LLM providers](docs/llm-providers.md)
 - [Contributing](CONTRIBUTING.md)
 
-### Roadmap
-
-V3 (current): config-driven + 5 builtin intents + multi-format RAG (incl. docx/xlsx) + OCR/Vision fallback + remote knowledge connectors (S3/Git/Notion) + custom handler plugins + LangSmith evaluation + drop-in chat widget.
-
-Next: reranker default-on, multi-tenant collection isolation, real-time webhook sync.
-
 ### License
 
 [MIT](LICENSE)
@@ -227,7 +248,34 @@ Next: reranker default-on, multi-tenant collection isolation, real-time webhook 
 
 ## 中文
 
-基于 LangGraph + FastAPI 的通用客服 agent。通过单一 `agent.yaml` 配置文件切换 LLM、知识源、意图、业务工具 —— 无需改代码。
+一个**通用客服 agent** —— 同一份代码，靠配置适配各种客服场景，不改业务代码。
+
+### 为什么是"通用"
+
+agent 本身不绑死任何业务领域，只提供一个可配置的 LLM + RAG + 工具调用框架。不同场景换 `agent.yaml` 即可：
+
+- **电商客服** — 退换货 / 物流 / 库存 FAQ
+- **SaaS 技术支持** — API 报错 / SDK 用法 / 限流排查
+- **银行 / 保险** — 账户查询 / 保单检索 / 投诉分流（接自家 API）
+- **教育 / 培训** — 课程答疑 / 作业辅助
+- **企业内部 IT / HR** — 请假政策 / 工单路由 / 密码重置
+- **自定义场景** — 丢文档、配工具、定义意图就行
+
+**配置即产品**：
+
+| 维度 | 怎么换 | 位置 |
+|---|---|---|
+| LLM provider | `llm.provider` (openai / anthropic / deepseek / ollama / azure) | `agent.yaml` |
+| Embedding 模型 | `embedding.provider` + `embedding.model` | `agent.yaml` |
+| 知识源 | `connector: local / s3 / git / notion` 每条独立配 | `agent.yaml` `knowledge.sources:` |
+| 文档格式 | `format: md / pdf / docx / xlsx / pdf_advanced / ...` | `agent.yaml` |
+| 检索策略 | `retriever.strategy: vector / hybrid / multiquery / hyde` | `agent.yaml` |
+| 意图 | `intents:` 列表（`builtin:*` 或自定义 handler 路径） | `agent.yaml` |
+| 业务 API | `tools:` 列表（endpoint + auth + 模板） | `agent.yaml` |
+| 自定义 Python 逻辑 | 把 `.py` 丢进 `~/.customer-agent/handlers/` | 文件系统 |
+| 可观测 | `langsmith.enabled: true` + `LANGSMITH_API_KEY` | `agent.yaml` + env |
+
+不改代码，不重新构建。改 yaml、重启、完成。
 
 ### 特性
 
@@ -424,12 +472,6 @@ const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId 
 - [工具配置](docs/tools.md)
 - [LLM providers](docs/llm-providers.md)
 - [贡献指南](CONTRIBUTING.md)
-
-### 路线图
-
-V3（当前）：配置驱动 + 5 builtin intent + 多格式 RAG（含 docx/xlsx）+ OCR/Vision 兜底 + 远程 connector（S3/Git/Notion）+ 自定义 handler 插件 + LangSmith 评估 + chat-widget。
-
-下一步：rerank 默认开、多租户 collection 隔离、实时 webhook 同步。
 
 ### 许可证
 
