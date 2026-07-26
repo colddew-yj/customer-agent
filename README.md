@@ -174,19 +174,137 @@ Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in
 ### Architecture
 
 ```
-Browser / Frontend
-       │
-       ▼  POST /chat (SSE)
-Next.js BFF (forwards Authorization + X-User-Id)
-       │
-       ▼  HTTP
-customer-agent (FastAPI)
-       │
-       ├─ LangGraph: classify → {faq | account | complaint | chat | refuse}
-       │
-       ├─ Knowledge: connector → loader → splitter → embedding → Chroma → hybrid retriever
-       │
-       └─ Tools: invokes business APIs (orders / balance / tickets)
+┌────────────────────────────────────────────────────────────────────────────┐
+│                              BROWSER / FRONTEND                            │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  chat-widget (examples/chat-widget/)                                │  │
+│  │  • ChatWidget.tsx — drop-in React component                          │  │
+│  │  • useChatStream.ts — SSE consumer hook (independently usable)       │  │
+│  │  • storage.ts — localStorage (session id + history)                  │  │
+│  │  • styles.css (ca-cw-* prefix, CSS-overridable)                      │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+└─────────────┬──────────────────────────────────────────────────────────────┘
+              │  POST /api/agent/chat  (SSE: data: {"type":"token","content":"..."})
+              │  Headers: Authorization (user token) + X-User-Id
+              ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                        BUSINESS BFF  (your code)                            │
+│  examples/bff/nextjs/route.ts  (template)                                  │
+│  • Reads your app's session cookie                                          │
+│  • Forwards Authorization + X-User-Id + X-Thread-Id to agent                │
+│  • Streams agent SSE back to browser (no buffering)                          │
+└─────────────┬──────────────────────────────────────────────────────────────┘
+              │  HTTP
+              ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    customer-agent  (FastAPI :8000)                         │
+│                                                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                      FastAPI  (server.py)                      │    │
+│   │  POST /chat    → SSE stream                                   │    │
+│   │  POST /ingest  → re-index knowledge                          │    │
+│   │  POST /feedback → push user score to LangSmith run           │    │
+│   │  GET  /health   → liveness probe                             │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                     LangGraph  (graph.py)                      │    │
+│   │  classify_node  (LLM picks intent)                            │    │
+│   │       │                                                        │    │
+│   │       ▼                                                        │    │
+│   │  ┌───────────────────────────────────────────────────────┐    │    │
+│   │  │ Intent Handlers (skills/ — 5 builtin + custom)        │    │    │
+│   │  │  faq        — RAG → answer                             │    │    │
+│   │  │  account    — ToolRegistry.invoke(...) → answer         │    │    │
+│   │  │  complaint  — LLM direct (empathy prompt)             │    │    │
+│   │  │  chat       — LLM direct (small-talk prompt)           │    │    │
+│   │  │  refuse     — preset reply (no LLM)                    │    │    │
+│   │  └───────────────────────────────────────────────────────┘    │    │
+│   │       │  custom:  ~/.customer-agent/handlers/<name>.py:build    │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                   Retrieval Layer                              │    │
+│   │  RetrieverConfig.strategy: vector | hybrid | multiquery | hyde  │    │
+│   │                                                                │    │
+│   │  ┌────────────── Knowledge Pipeline ──────────────────────┐    │    │
+│   │  │ Connector (local / s3 / git / notion)                  │    │    │
+│   │  │   ↓  sync()                                            │    │    │
+│   │  │ Loader (md / pdf / html / csv / json / docx / xlsx /    │    │    │
+│   │  │        pdf_advanced=PDF+OCR+Vision fallback)            │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Splitter (RecursiveCharacterTextSplitter)              │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Embedding (openai / huggingface / ollama / fake)       │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Vector Store (chroma / in-memory) + BM25 chunks (pkl) │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Retriever:  vector + BM25 → RRF / weighted              │    │    │
+│   │  │            multiquery / hyde (LLM-generated variants)   │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Reranker (FlagEmbedding cross-encoder, default-on)     │    │    │
+│   │  └─────────────────────────────────────────────────────────┘    │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                  ToolRegistry  (tools/registry.py)             │    │
+│   │  • HTTP call with bearer / header:X-Name / none auth          │    │
+│   │  • Template rendering ({{user_token}} / {{user_id}} / ...)      │    │
+│   │  • Response path extraction (e.g. data.balance)                │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                  Observability  (observability.py)             │    │
+│   │  • LangChainTracer → LangSmith SaaS (when enabled + key set)   │    │
+│   │  • Local JSONL trace fallback                                  │    │
+│   │  • push_feedback(run_id, score) → LangSmith Client            │    │
+│   │  • Trace run-on-dataset eval (agent.eval.runner)              │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                                                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                  Configuration  (config.py)                    │    │
+│   │  AgentConfig (pydantic) — single source of truth                │    │
+│   │  • llm / embedding / vector_store                              │    │
+│   │  • retriever (strategy / fusion / rerank)                      │    │
+│   │  • knowledge.sources[].connector / format / ocr / vision_llm   │    │
+│   │  • tools[] (endpoint / auth / request_template)                │    │
+│   │  • intents[].handler (builtin:xxx | path.py:build)             │    │
+│   │  • server (cors / heartbeat)                                   │    │
+│   │  • langsmith.evaluation (dataset_name / evaluators)             │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                                                                            │
+└─────────────┬──────────────────────────────────────────────────────────────┘
+              │                              │
+              ▼                              ▼
+┌──────────────────────────┐   ┌────────────────────────────────────────────┐
+│   LLM Providers (业务方) │   │   Observability (optional)                  │
+│   • OpenAI                │   │   • LangSmith SaaS (client + dataset)     │
+│   • Anthropic             │   │   • Local JSONL trace                      │
+│   • DeepSeek              │   │   • LLM-as-judge evaluator                 │
+│   • Ollama (local)        │   └────────────────────────────────────────────┘
+│   • Azure OpenAI          │
+│   业务方自己 key / 自己付 │    ┌────────────────────────────────────────────┐
+└──────────────────────────┘   │   Storage (per agent instance)              │
+                              │   • ./data/chroma (vector store)            │
+                              │   • ./data/bm25_chunks.pkl (BM25 chunks)     │
+                              │   • ./data/checkpoints.db (multi-turn)     │
+                              │   • ./data/cache/<source>/ (remote cache)   │
+                              └────────────────────────────────────────────┘
+```
+
+**Request flow** (one `/chat` request):
+
+```
+Browser → ChatWidget
+   └─ fetch /api/agent/chat (SSE)
+        └─ BFF (cookie → access token)
+             └─ POST /chat (Authorization + X-User-Id + X-Thread-Id)
+                  └─ agent/server.py
+                       └─ runner.astream_tokens(graph, cfg, ...)
+                            ├─ graph = StateGraph(classify → intent handler)
+                            │    └─ retriever / tool registry
+                            │         └─ LangSmith tracer
+                            └─ SSE 事件流：sources / token / done
 ```
 
 ### Quick demo
@@ -237,50 +355,6 @@ const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId 
 - [Tool configuration](docs/tools.md)
 - [LLM providers](docs/llm-providers.md)
 - [Contributing](CONTRIBUTING.md)
-
-### Roadmap
-
-V1 (initial): config-driven core, 5 builtin intents, multi-format RAG, multi-LLM, SSE.
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ V1  foundation                                                       │
-│ • 5 builtin intents: faq / account / complaint / chat / refuse      │
-│ • Multi-format loader: md / txt / pdf / html / csv / json           │
-│ • Hybrid retrieval: vector + BM25 (weighted ensemble)               │
-│ • LLM factory: openai / anthropic / deepseek / ollama / azure       │
-│ • SSE token streaming + FastAPI                                     │
-│ • Tool registry with template rendering                             │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ V2  retrieval + observability + plugins                             │
-│ • Retrieval strategies: vector / hybrid / multiquery / hyde         │
-│ • Fusion: RRF (Reciprocal Rank Fusion) + weighted                   │
-│ • BM25 chunks dump → runtime index (was empty in V1)                │
-│ • LangSmith: trace + Dataset + Evaluator (heuristic / llm-judge)    │
-│ • /feedback endpoint → LangSmith run                                │
-│ • Custom handler plugin: ~/.customer-agent/handlers/                │
-│ • PyMuPDFLoader fallback (double-column PDF + header-footer)         │
-│ • LangSmith observability integrated                                │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ V3  remote knowledge + multimodal + frontend                         │
-│ • Remote connectors: S3 / Git / Notion (boto3 + httpx)              │
-│ • docx / xlsx loaders (python-docx + openpyxl)                       │
-│ • OCR (tesseract) + Vision LLM fallback for scanned docs            │
-│ • Drop-in chat-widget: React + Tailwind (3 usage modes)             │
-│ • Cross-encoder reranker default-on (FlagEmbedding)                 │
-│ • Polyglot README (English + 中文)                                  │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-        (current: V3 ships; SaaS multi-tenant + realtime sync
-         deferred — see /plan and business-side feedback)
-```
 
 **License**
 
@@ -517,47 +591,140 @@ const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId 
 - [LLM providers](docs/llm-providers.md)
 - [贡献指南](CONTRIBUTING.md)
 
-### 技术路线
-
-V1（初版）：配置驱动核心、5 个内置意图、多格式 RAG、多 LLM、SSE 流。
+### 技术架构
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│ V1  基础                                                              │
-│ • 5 个内置意图：faq / account / complaint / chat / refuse             │
-│ • 多格式 loader：md / txt / pdf / html / csv / json                  │
-│ • 混合检索：向量 + BM25（weighted ensemble）                         │
-│ • LLM factory：openai / anthropic / deepseek / ollama / azure        │
-│ • SSE token 流 + FastAPI                                             │
-│ • 工具注册表 + 模板渲染                                              │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ V2  检索增强 + 可观测 + 插件化                                       │
-│ • 检索策略：vector / hybrid / multiquery / hyde                      │
-│ • 融合：RRF（Reciprocal Rank Fusion）+ weighted                       │
-│ • BM25 chunks 落盘 → 运行时索引（V1 一直为空）                      │
-│ • LangSmith：trace + Dataset + Evaluator（heuristic / llm-judge）   │
-│ • /feedback 端点 → 写回 LangSmith run                                │
-│ • 自定义 handler 插件：~/.customer-agent/handlers/                   │
-│ • PyMuPDFLoader fallback（双栏 PDF + 页眉页脚过滤）                  │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ V3  远程知识库 + 多模态 + 前端组件                                   │
-│ • 远程 connector：S3 / Git / Notion（boto3 + httpx）                  │
-│ • docx / xlsx loader（python-docx + openpyxl）                       │
-│ • OCR（tesseract）+ Vision LLM 兜底，处理扫描件                       │
-│ • 开箱即用 chat-widget：React + Tailwind（3 种用法）                  │
-│ • Cross-encoder rerank 默认开（FlagEmbedding）                       │
-│ • README 双语（English + 中文）                                      │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-       （当前：V3 已发布；SaaS 多租户 + 实时增量同步
-         暂缓 —— 依据 /plan 与业务方真实反馈）
+┌────────────────────────────────────────────────────────────────────────────┐
+│                              浏览器 / 前端                                 │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  chat-widget（examples/chat-widget/）                              │  │
+│  │  • ChatWidget.tsx — 开箱即用 React 组件                            │  │
+│  │  • useChatStream.ts — SSE 消费 hook（可独立用）                    │  │
+│  │  • storage.ts — localStorage（session id + 历史）                   │  │
+│  │  • styles.css（ca-cw-* 前缀，可覆盖）                              │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+└─────────────┬──────────────────────────────────────────────────────────────┘
+              │  POST /api/agent/chat  (SSE: data: {"type":"token","content":"..."})
+              │  Headers: Authorization（用户 token）+ X-User-Id
+              ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                        业务方 BFF（自家代码）                              │
+│  examples/bff/nextjs/route.ts（模板）                                    │
+│  • 读自家 cookie / session                                              │
+│  • 透传 Authorization + X-User-Id + X-Thread-Id 到 agent                  │
+│  • SSE 流透传给浏览器（不缓冲）                                          │
+└─────────────┬──────────────────────────────────────────────────────────────┘
+              │  HTTP
+              ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    customer-agent（FastAPI :8000）                       │
+│                                                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                      FastAPI（server.py）                     │    │
+│   │  POST /chat    → SSE 流                                      │    │
+│   │  POST /ingest  → 重新入库                                    │    │
+│   │  POST /feedback → 用户评分写回 LangSmith run                  │    │
+│   │  GET  /health   → 健康检查                                   │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                     LangGraph（graph.py）                     │    │
+│   │  classify_node（LLM 选意图）                                  │    │
+│   │       │                                                        │    │
+│   │       ▼                                                        │    │
+│   │  ┌───────────────────────────────────────────────────────┐    │    │
+│   │  │ Intent Handlers（skills/ — 5 内置 + 自定义）         │    │    │
+│   │  │  faq        — RAG → 回答                              │    │    │
+│   │  │  account    — ToolRegistry.invoke() → 回答            │    │    │
+│   │  │  complaint  — LLM 直答（共情 prompt）                 │    │    │
+│   │  │  chat       — LLM 直答（闲聊 prompt）                   │    │    │
+│   │  │  refuse     — 预设话术（不调 LLM）                     │    │    │
+│   │  └───────────────────────────────────────────────────────┘    │    │
+│   │       │  自定义：~/.customer-agent/handlers/<name>.py:build     │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                     检索层                                     │    │
+│   │  RetrieverConfig.strategy: vector | hybrid | multiquery | hyde │    │
+│   │                                                                │    │
+│   │  ┌────────────────────── 知识管线 ──────────────────────┐    │    │
+│   │  │ Connector（local / s3 / git / notion）                  │    │    │
+│   │  │   ↓  sync()                                            │    │    │
+│   │  │ Loader（md / pdf / html / csv / json / docx / xlsx / │    │    │
+│   │  │        pdf_advanced=PDF+OCR+Vision 兜底）              │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Splitter（RecursiveCharacterTextSplitter）              │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Embedding（openai / huggingface / ollama / fake）       │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Vector Store（chroma / in-memory）+ BM25 chunks（pkl） │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Retriever：vector + BM25 → RRF / weighted               │    │    │
+│   │  │            multiquery / hyde（LLM 生成变体）             │    │    │
+│   │  │   ↓                                                     │    │    │
+│   │  │ Reranker（FlagEmbedding cross-encoder，默认开）         │    │    │
+│   │  └─────────────────────────────────────────────────────────┘    │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                  ToolRegistry（tools/registry.py）             │    │
+│   │  • HTTP 调用（bearer / header:X-Name / none 鉴权）         │    │
+│   │  • 模板渲染（{{user_token}} / {{user_id}} / ...）              │    │
+│   │  • 响应字段提取（如 data.balance）                              │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                              │                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                  Observability（observability.py）             │    │
+│   │  • LangChainTracer → LangSmith SaaS（启用 + 设 key 时）        │    │
+│   │  • 本地 JSONL trace fallback                                    │    │
+│   │  • push_feedback(run_id, score) → LangSmith Client             │    │
+│   │  • 跑评估集 trace（agent.eval.runner）                        │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                                                                            │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                  配置（config.py）                              │    │
+│   │  AgentConfig（pydantic）— 单一事实来源                          │    │
+│   │  • llm / embedding / vector_store                              │    │
+│   │  • retriever（strategy / fusion / rerank）                    │    │
+│   │  • knowledge.sources[].connector / format / ocr / vision_llm   │    │
+│   │  • tools[]（endpoint / auth / request_template）               │    │
+│   │  • intents[].handler（builtin:xxx | path.py:build）           │    │
+│   │  • server（cors / heartbeat）                                 │    │
+│   │  • langsmith.evaluation（dataset_name / evaluators）           │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                                                                            │
+└─────────────┬──────────────────────────────────────────────────────────────┘
+              │                              │
+              ▼                              ▼
+┌──────────────────────────┐   ┌────────────────────────────────────────────┐
+│   LLM Providers（业务方） │   │   可观测（可选）                          │
+│   • OpenAI                │   │   • LangSmith SaaS（client + dataset）     │
+│   • Anthropic             │   │   • 本地 JSONL trace                      │
+│   • DeepSeek              │   │   • LLM-as-judge evaluator                 │
+│   • Ollama（本地）        │   └────────────────────────────────────────────┘
+│   • Azure OpenAI          │
+│   业务方自己 key / 自己付 │    ┌────────────────────────────────────────────┐
+└──────────────────────────┘   │   存储（每个 agent 实例）                  │
+                              │   • ./data/chroma（向量库）                 │
+                              │   • ./data/bm25_chunks.pkl（BM25 chunks）    │
+                              │   • ./data/checkpoints.db（多轮历史）        │
+                              │   • ./data/cache/<source>/（远程缓存）       │
+                              └────────────────────────────────────────────┘
+```
+
+**单次请求流**（一次 `/chat` 调用）：
+
+```
+浏览器 → ChatWidget
+   └─ fetch /api/agent/chat（SSE）
+        └─ BFF（cookie → access token）
+             └─ POST /chat（Authorization + X-User-Id + X-Thread-Id）
+                  └─ agent/server.py
+                       └─ runner.astream_tokens(graph, cfg, ...)
+                            ├─ graph = StateGraph(classify → intent handler)
+                            │    └─ retriever / tool registry
+                            │         └─ LangSmith tracer
+                            └─ SSE 事件流：sources / token / done
 ```
 
 ### 许可证
