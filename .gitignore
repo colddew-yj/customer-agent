@@ -42,7 +42,7 @@ chroma_data/
 .DS_Store
 
 # Local knowledge (业务方挂的私人文档，运行时挂到 /app/knowledge)
-knowledge/
+/knowledge/
 examples/knowledge/docs/
 
 # Build
