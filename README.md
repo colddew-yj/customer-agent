@@ -27,6 +27,12 @@ curl -N -X POST http://localhost:8000/chat \
 - **流式响应**：SSE token 级输出，前端逐字显示
 - **可观测**：LangSmith trace + 本地 fallback
 
+## 截图
+
+> 待补：聊天面板 / RAG 检索流程 / LangSmith trace / SSE 流
+
+<!-- TODO: 加 `docs/screenshots/chat.png`、`docs/screenshots/ingest.png`、`docs/screenshots/langsmith.png`，引用方式 ![chat](docs/screenshots/chat.png) -->
+
 ## 安装
 
 ### Docker（推荐）

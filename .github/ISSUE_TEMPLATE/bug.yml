@@ -1,0 +1,40 @@
+name: Bug report
+description: 报告 bug
+labels: bug
+body:
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: |
+        1. 跑哪条命令 / 调哪个 endpoint
+        2. 期望
+        3. 实际
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: |
+        - OS:
+        - Python:
+        - Docker / pip:
+        - LLM provider + model:
+        - 部署模式（docker compose / K8s / 裸 Python）：
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 错误
+      description: docker logs / pytest 输出 / 截图
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其它
+      description: 任何补充
+    validations:
+      required: false

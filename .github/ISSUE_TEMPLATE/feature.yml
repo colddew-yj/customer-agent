@@ -1,0 +1,32 @@
+name: Feature request
+description: 提议新功能
+labels: enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解决的问题
+      description: 业务场景是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提议方案
+      description: 怎么改 / 加？
+    validations:
+      required: true
+  - type: textarea
+    id: alt
+    attributes:
+      label: 替代方案
+      description: 考虑过哪些其他方式？
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其它
+      description: 补充
+    validations:
+      required: false
