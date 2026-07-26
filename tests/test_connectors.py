@@ -79,7 +79,7 @@ def test_git_connector_path_filter(tmp_path):
 
 def test_factory_unknown_connector(tmp_path):
     try:
-        build_connector("test", {"unknown": True}, tmp_path)
+        build_connector("test", {}, tmp_path, connector_type="nonsense")
     except ValueError as e:
         assert "未知 connector" in str(e)
     else:

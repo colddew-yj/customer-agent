@@ -48,3 +48,6 @@ examples/knowledge/docs/
 # Build
 *.whl
 *.tar.gz
+
+# Frontend demo dependencies
+examples/chat-widget/demo/node_modules/
