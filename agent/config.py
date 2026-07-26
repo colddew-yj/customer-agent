@@ -63,13 +63,17 @@ class RetrieverConfig(BaseModel):
 
 class KnowledgeSourceConfig(BaseModel):
     name: str
-    path: str
+    path: str | None = None               # 本地 connector 用；远程 connector 留 None
     glob: str = "**/*"
-    format: str = "auto"                   # md | txt | pdf | html | csv | json | auto
+    format: str = "auto"                  # md | txt | pdf | html | csv | json | jsonl | docx | xlsx | pdf_advanced | auto
     chunk_size: int = 500
     chunk_overlap: int = 50
     retrieval_weight: float = 1.0
     metadata_tags: dict[str, str] = Field(default_factory=dict)
+
+    # V3: 远程 connector
+    connector: str | None = None           # local | s3 | git | notion | None (= local)
+    connector_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class KnowledgeConfig(BaseModel):
@@ -194,6 +198,12 @@ def _validate(cfg: AgentConfig, cfg_path: Path) -> None:
 
     base = cfg_path.parent
     for src in cfg.knowledge.sources:
+        # V3: 远程 connector 不要求 path 存在
+        if src.connector and src.connector != "local":
+            continue
+        if src.path is None:
+            errors.append(f"knowledge_sources '{src.name}' 必须配 path 或 connector")
+            continue
         p = base / src.path
         if not p.exists():
             errors.append(f"knowledge_sources '{src.name}' path '{p}' 不存在")

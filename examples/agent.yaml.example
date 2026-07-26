@@ -30,20 +30,41 @@ retriever:
 
 knowledge:
   sources:
-    - name: faq
+    # ────── 本地（dev / 小库） ──────
+    - name: faq-local
       path: ./knowledge/faq
       glob: "**/*.md"
       format: md
       chunk_size: 500
       chunk_overlap: 50
       metadata_tags: { category: faq }
-    - name: products
-      path: ./knowledge/products
-      glob: "**/*.pdf"
-      format: pdf
-      chunk_size: 800
-      chunk_overlap: 100
-      metadata_tags: { category: products }
+
+    # ────── S3 / R2 / MinIO / 阿里云 OSS ──────
+    - name: wiki-s3
+      connector: s3
+      connector_config:
+        bucket: company-wiki
+        prefix: docs/
+        endpoint_url: https://s3.amazonaws.com   # R2: https://<accountid>.r2.cloudflarestorage.com
+        aws_key_env: AWS_ACCESS_KEY_ID
+        aws_secret_env: AWS_SECRET_ACCESS_KEY
+        region: us-east-1
+
+    # ────── Git 仓库 ──────
+    - name: kb-git
+      connector: git
+      connector_config:
+        repo_url: https://github.com/me/kb.git
+        branch: main
+        path_filter: "docs/*.md"
+
+    # ────── Notion database ──────
+    - name: faq-notion
+      connector: notion
+      connector_config:
+        api_key_env: NOTION_API_KEY
+        database_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        title_property: Name
 
 tools:
   - name: query_balance
