@@ -1,14 +1,19 @@
 """
-P6: Token 级 SSE 流。
+Token 级 SSE 流。
 
 astream_events(version="v2") 监听 on_chat_model_stream，
 放行 GENERATE_NODES 中的 token，过滤 classify 的 JSON 误推。
+
+可观测：把 langsmith_callbacks(cfg) 通过 config["callbacks"] 注入 astream_events。
+本地 trace：trace_run(cfg, ...) 包整段，记录 latency + status。
 """
 from __future__ import annotations
 
 from typing import AsyncIterator
 
 from langchain_core.messages import HumanMessage
+
+from .observability import langsmith_callbacks, trace_run
 
 
 GENERATE_NODES = {"faq", "account", "complaint", "chat"}
@@ -29,44 +34,48 @@ async def astream_tokens(
         "user_id": user_id,
         "messages": [HumanMessage(content=question)],
     }
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "callbacks": langsmith_callbacks(cfg),
+    }
     sources_emitted = False
 
-    async for event in graph.astream_events(initial, config=config, version="v2"):
-        kind = event.get("event")
-        if not sources_emitted and kind == "on_chain_end":
-            output = event.get("data", {}).get("output", {})
-            if isinstance(output, dict) and output.get("sources"):
-                sources_emitted = True
-                docs = output["sources"] or []
-                yield {
-                    "type": "sources",
-                    "sources": [
-                        {
-                            "file_name": d.metadata.get("source_name", "unknown"),
-                            "chunk_index": d.metadata.get("chunk_index"),
-                            "snippet": d.page_content[:100].replace("\n", " "),
-                        }
-                        for d in docs
-                    ],
-                }
-                continue
+    with trace_run(cfg, "graph_astream_tokens", thread_id=thread_id, question=question):
+        async for event in graph.astream_events(initial, config=config, version="v2"):
+            kind = event.get("event")
+            if not sources_emitted and kind == "on_chain_end":
+                output = event.get("data", {}).get("output", {})
+                if isinstance(output, dict) and output.get("sources"):
+                    sources_emitted = True
+                    docs = output["sources"] or []
+                    yield {
+                        "type": "sources",
+                        "sources": [
+                            {
+                                "file_name": d.metadata.get("source_name", "unknown"),
+                                "chunk_index": d.metadata.get("chunk_index"),
+                                "snippet": d.page_content[:100].replace("\n", " "),
+                            }
+                            for d in docs
+                        ],
+                    }
+                    continue
 
-        if kind == "on_chat_model_stream":
-            meta = event.get("metadata", {}) or {}
-            node = meta.get("langgraph_node") or ""
-            if node not in GENERATE_NODES:
-                continue
-            chunk = event.get("data", {}).get("chunk")
-            content = getattr(chunk, "content", "")
-            if content:
-                yield {"type": "token", "content": content}
+            if kind == "on_chat_model_stream":
+                meta = event.get("metadata", {}) or {}
+                node = meta.get("langgraph_node") or ""
+                if node not in GENERATE_NODES:
+                    continue
+                chunk = event.get("data", {}).get("chunk")
+                content = getattr(chunk, "content", "")
+                if content:
+                    yield {"type": "token", "content": content}
 
-        if kind == "on_chain_end":
-            output = event.get("data", {}).get("output", {})
-            meta = event.get("metadata", {}) or {}
-            node = meta.get("langgraph_node") or ""
-            if node == "refuse" and isinstance(output, dict) and output.get("answer"):
-                yield {"type": "token", "content": output["answer"]}
+            if kind == "on_chain_end":
+                output = event.get("data", {}).get("output", {})
+                meta = event.get("metadata", {}) or {}
+                node = meta.get("langgraph_node") or ""
+                if node == "refuse" and isinstance(output, dict) and output.get("answer"):
+                    yield {"type": "token", "content": output["answer"]}
 
     yield {"type": "done"}

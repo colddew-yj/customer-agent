@@ -1,4 +1,8 @@
-"""Account handler: 调业务 API 查账户 + LLM 生成回答。"""
+"""Realtime-data handler: 调外部工具（业务 API）取实时数据 → LLM 生成回答。
+
+通用型：业务方在 agent.yaml `intents:` 把这个 handler 命名（如 account / lookup / query_xxx），
+endpoint 在 `tools:` 段配。回答什么完全由业务方的工具决定。
+"""
 from __future__ import annotations
 
 import json
@@ -8,15 +12,15 @@ from langchain_core.prompts import ChatPromptTemplate
 from .state import GraphState
 
 
-SYSTEM = """你是 {brand} 的 {assistant}。用户问账户相关问题。
+SYSTEM = """你是 {brand} 的 {assistant}。用户问的问题需要实时数据才能回答。
 
-下面是实时从业务 API 拉取的账户数据（JSON）。
+下面是刚刚从外部接口拉取的实时数据（JSON）。
 
 规则：
-1. 基于 JSON 回答用户问题，不编造数字
+1. 基于 JSON 回答，不编造数字或字段
 2. 用用户语言回答，不超过 200 字
-3. success=false 时告诉用户 API 失败，让其稍后再试
-4. 不暴露 token / user_id / API URL"""
+3. success=false 时告诉用户接口暂时拿不到数据，让其稍后再试
+4. 不暴露 token / user_id / 接口 URL"""
 
 
 def build(ctx):
@@ -27,7 +31,7 @@ def build(ctx):
     assistant = ctx["config"].assistant_name
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM.format(brand=brand, assistant=assistant)),
-        ("human", "用户问题：{question}\n\n实时账户数据（JSON）：\n{account_data}\n\n回答："),
+        ("human", "用户问题：{question}\n\n实时数据（JSON）：\n{realtime_data}\n\n回答："),
     ])
     chain = prompt | llm
 
@@ -44,15 +48,21 @@ def build(ctx):
             results.append({"tool": name, "result": tools.invoke(name, ctx_inv)})
 
         ok = all(r["result"].get("success") for r in results) if results else False
-        account_data = {"success": ok, "results": results}
+        realtime_data = {"success": ok, "results": results}
 
         if not ok:
-            return {"account_data": account_data, "answer": "暂时无法获取你的账户数据，请稍后再试。"}
+            return {
+                "realtime_data": realtime_data,
+                "answer": "暂时拿不到实时数据，请稍后再试。",
+            }
 
         out = chain.invoke({
             "question": state["question"],
-            "account_data": json.dumps(account_data, ensure_ascii=False, indent=2),
+            "realtime_data": json.dumps(realtime_data, ensure_ascii=False, indent=2),
         })
-        return {"account_data": account_data, "answer": getattr(out, "content", out)}
+        return {
+            "realtime_data": realtime_data,
+            "answer": getattr(out, "content", out),
+        }
 
     return node
