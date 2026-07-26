@@ -28,7 +28,7 @@ def test_local_connector_missing_path(tmp_path):
 
 
 def _init_tmp_git_repo(work: Path):
-    subprocess.run(["git", "init", "--bare", str(work.parent / "origin.git")], check=True, capture_output=True)
+    subprocess.run(["git", "init", "--bare", "--initial-branch=main", str(work.parent / "origin.git")], check=True, capture_output=True)
     subprocess.run(["git", "clone", str(work.parent / "origin.git"), str(work)], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(work), "config", "user.email", "t@t"], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(work), "config", "user.name", "t"], check=True, capture_output=True)
