@@ -20,11 +20,13 @@ vector_store:
   collection_name: knowledge
 
 retriever:
+  strategy: hybrid            # vector | hybrid | multiquery | hyde
   top_k: 5
   fetch_k: 10
-  hybrid: true
-  rerank: false
+  fusion: rrf                # 当 strategy=hybrid：rrf | weighted
   bm25_tokenizer: jieba
+  multi_query: { n_variants: 3 }
+  hyde: { enabled: false }
 
 knowledge:
   sources:
@@ -83,4 +85,5 @@ server:
 assistant_name: 客服助理
 brand_name: MyProduct
 
-refuse_message: 这个问题跟 {brand} 业务无关，我暂时帮不上忙。
+# 可选（pydantic 接受 extra 字段，未在 schema 声明）
+refuse_message: "这个问题跟 {brand} 业务无关，我暂时帮不上忙。"

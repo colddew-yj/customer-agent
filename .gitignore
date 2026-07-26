@@ -41,9 +41,9 @@ chroma_data/
 *.swo
 .DS_Store
 
-# Local knowledge (业务方挂的私人文档)
+# Local knowledge (业务方挂的私人文档，运行时挂到 /app/knowledge)
 knowledge/
-docs/
+examples/knowledge/docs/
 
 # Build
 *.whl
