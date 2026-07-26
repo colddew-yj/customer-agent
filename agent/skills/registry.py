@@ -9,7 +9,7 @@ handler 字符串取值：
   builtin:faq / builtin:account / builtin:complaint / builtin:chat / builtin:refuse
   /abs/path/to/handler.py:build
   handlers/order.py:build       (相对 cwd)
-  order                         (从 ~/.customer-agent/handlers/ 找)
+  order                         (从 ~/.customer-helpmesh-agent/handlers/ 找)
 """
 from __future__ import annotations
 

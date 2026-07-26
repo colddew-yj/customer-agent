@@ -1,7 +1,7 @@
 """
 Eval runner：拉 dataset → 对每个 example 跑 agent → 跑 evaluators → 汇总。
 
-CLI: customer-agent eval --dataset <name>
+CLI: customer-helpmesh-agent eval --dataset <name>
 """
 from __future__ import annotations
 
@@ -86,7 +86,7 @@ def run_eval(dataset_name: str, evaluator_names: list[str] | None = None) -> dic
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="customer-agent eval")
+    parser = argparse.ArgumentParser(description="customer-helpmesh-agent eval")
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--config", default="./agent.yaml")
     args = parser.parse_args(argv)

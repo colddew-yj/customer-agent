@@ -6,7 +6,7 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="customer-agent CLI")
+    parser = argparse.ArgumentParser(description="customer-helpmesh-agent CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_serve = sub.add_parser("serve", help="启动 FastAPI server")

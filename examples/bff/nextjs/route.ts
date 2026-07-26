@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-const AGENT_URL = process.env.AGENT_URL ?? "http://customer-agent:8000";
+const AGENT_URL = process.env.AGENT_URL ?? "http://customer-helpmesh-agent:8000";
 
 export const runtime = "nodejs";
 

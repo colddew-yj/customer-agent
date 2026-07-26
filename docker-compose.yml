@@ -1,8 +1,8 @@
 services:
-  customer-agent:
+  customer-helpmesh-agent:
     build: .
-    image: customer-agent:latest
-    container_name: customer-agent
+    image: customer-helpmesh-agent:latest
+    container_name: customer-helpmesh-agent
     restart: unless-stopped
     ports:
       - "8000:8000"

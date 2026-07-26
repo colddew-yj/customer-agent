@@ -1,14 +1,14 @@
-# customer-agent (FastAPI + LangGraph)
+# customer-helpmesh-agent (FastAPI + LangGraph)
 #
 # Build:
-#   docker build -t customer-agent:latest .
+#   docker build -t customer-helpmesh-agent:latest .
 #
 # Run:
 #   docker run --rm -p 8000:8000 \
 #     -v $(pwd)/agent.yaml:/app/agent.yaml:ro \
 #     -v $(pwd)/knowledge:/app/knowledge:ro \
-#     -v customer-agent-data:/app/data \
-#     customer-agent:latest
+#     -v customer-helpmesh-agent-data:/app/data \
+#     customer-helpmesh-agent:latest
 
 FROM python:3.11-slim
 

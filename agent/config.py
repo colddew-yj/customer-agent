@@ -120,7 +120,7 @@ class EvaluationConfig(BaseModel):
 class LangSmithConfig(BaseModel):
     enabled: bool = False
     api_key_env: str = "LANGSMITH_API_KEY"
-    project: str = "customer-agent"
+    project: str = "customer-helpmesh-agent"
     local_trace_path: str | None = None
     evaluation: EvaluationConfig = EvaluationConfig()
 

@@ -1,7 +1,7 @@
 {
-  "name": "customer-agent-chat-widget",
+  "name": "customer-helpmesh-agent-chat-widget",
   "version": "0.1.0",
-  "description": "开箱即用客服聊天面板（与 customer-agent 后端 SSE 对接）",
+  "description": "开箱即用客服聊天面板（与 customer-helpmesh-agent 后端 SSE 对接）",
   "main": "src/index.ts",
   "types": "src/types.ts",
   "scripts": {

@@ -3,12 +3,12 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "customer-agent"
+name = "customer-helpmesh-agent"
 version = "0.1.0"
 description = "通用客服 agent (LangGraph + FastAPI)"
 requires-python = ">=3.11,<3.14"
 license = { text = "MIT" }
-authors = [{ name = "customer-agent contributors" }]
+authors = [{ name = "customer-helpmesh-agent contributors" }]
 readme = "README.md"
 dependencies = [
     "fastapi>=0.115",
@@ -39,8 +39,8 @@ rerank = ["sentence-transformers>=3.2", "FlagEmbedding>=1.2.9"]
 dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.7"]
 
 [project.scripts]
-customer-agent = "agent.cli:main"
-customer-agent-ingest = "agent.knowledge.ingest:main"
+customer-helpmesh-agent = "agent.cli:main"
+customer-helpmesh-agent-ingest = "agent.knowledge.ingest:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

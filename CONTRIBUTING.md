@@ -3,8 +3,8 @@
 ## 开发
 
 ```bash
-git clone https://github.com/<org>/customer-agent
-cd customer-agent
+git clone https://github.com/<org>/customer-helpmesh-agent
+cd customer-helpmesh-agent
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 

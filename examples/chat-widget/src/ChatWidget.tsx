@@ -11,7 +11,7 @@ import "./styles.css";
  * ChatWidget：开箱即用客服聊天面板。
  *
  * 接入（业务方）：
- *   import { ChatWidget } from "customer-agent-chat-widget";
+ *   import { ChatWidget } from "customer-helpmesh-agent-chat-widget";
  *   <ChatWidget endpoint="/api/agent/chat" userId={session.userId} onClose={...} />
  *
  * 改样式：覆盖同 class 名（CSS specificity 高于 styles.css）。

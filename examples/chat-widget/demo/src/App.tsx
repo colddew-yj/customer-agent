@@ -45,7 +45,7 @@ export function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 p-8">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-          customer-agent chat-widget demo
+          customer-helpmesh-agent chat-widget demo
         </h1>
         <p className="text-gray-600 dark:text-zinc-400 mb-2">
           右下角蓝色圆形按钮是悬浮气泡。点击展开聊天面板。

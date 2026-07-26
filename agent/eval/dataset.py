@@ -26,7 +26,7 @@ def push_examples(name: str, examples: list[dict[str, Any]]) -> int:
 
     if client is not None:
         try:
-            ds = client.create_dataset(dataset_name=name, description="customer-agent eval set")
+            ds = client.create_dataset(dataset_name=name, description="customer-helpmesh-agent eval set")
             for ex in examples:
                 client.create_example(
                     inputs={"question": ex["q"]},

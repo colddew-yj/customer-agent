@@ -1,4 +1,4 @@
-# customer-agent runtime dependencies
+# customer-helpmesh-agent runtime dependencies
 # Pinned to match production-tested combo on Linux x86_64 / Python 3.11
 
 fastapi>=0.115,<0.150

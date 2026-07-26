@@ -1,6 +1,6 @@
-# customer-agent-chat-widget
+# customer-helpmesh-agent-chat-widget
 
-开箱即用客服聊天面板，与 [customer-agent](https://github.com/colddew-yj/customer-agent) 后端 SSE 对接。
+开箱即用客服聊天面板，与 [customer-helpmesh-agent](https://github.com/colddew-yj/customer-helpmesh-agent) 后端 SSE 对接。
 
 源参考自 hachey 项目 `components/customer-service/chat-panel.tsx`，交互逻辑相同，样式可改 / 组件可替换。
 

@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="customer-agent", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="customer-helpmesh-agent", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -146,7 +146,7 @@ async def health() -> dict:
 @app.get("/")
 async def root() -> dict:
     return {
-        "service": "customer-agent",
+        "service": "customer-helpmesh-agent",
         "version": "0.1.0",
         "intents": [it.name for it in (_cfg.intents if _cfg else [])],
     }

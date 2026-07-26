@@ -1,4 +1,4 @@
-# customer-agent
+# customer-helpmesh-agent
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
@@ -37,7 +37,7 @@ The configuration is the product:
 | Retrieval strategy | `retriever.strategy: vector / hybrid / multiquery / hyde` | `agent.yaml` |
 | Intents (FAQ / account / complaint / ...) | `intents:` list with `builtin:*` or custom handler paths | `agent.yaml` |
 | Business APIs | `tools:` list with endpoint + auth + templates | `agent.yaml` |
-| Custom Python behavior | drop a `.py` file in `~/.customer-agent/handlers/` | filesystem |
+| Custom Python behavior | drop a `.py` file in `~/.customer-helpmesh-agent/handlers/` | filesystem |
 | Observability | `langsmith.enabled: true` + `LANGSMITH_API_KEY` | `agent.yaml` + env |
 
 No code changes. No rebuild. Edit YAML, restart, done.
@@ -53,7 +53,7 @@ No code changes. No rebuild. Edit YAML, restart, done.
 - **Real user context** — HTTP headers (`Authorization` + `X-User-Id`) forwarded to tool calls
 - **Token-level streaming** — SSE output, frontend displays character by character
 - **LangSmith observability** — trace + evaluation + feedback
-- **Custom intent handlers** — drop a Python file into `~/.customer-agent/handlers/`, no fork needed
+- **Custom intent handlers** — drop a Python file into `~/.customer-helpmesh-agent/handlers/`, no fork needed
 - **Drop-in chat widget** — React + Tailwind component, ready to copy-paste
 - **Plug-and-play BFF examples** — Next.js / Express / FastAPI templates
 
@@ -72,8 +72,8 @@ curl -N -X POST http://localhost:8000/chat \
 **Docker (recommended)**
 
 ```bash
-git clone https://github.com/colddew-yj/customer-agent
-cd customer-agent
+git clone https://github.com/colddew-yj/customer-helpmesh-agent
+cd customer-helpmesh-agent
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env       # fill in your OPENAI_API_KEY
 docker compose up -d
@@ -87,7 +87,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env
-customer-agent                       # listens on 0.0.0.0:8000
+customer-helpmesh-agent                       # listens on 0.0.0.0:8000
 ```
 
 ### 30-minute integration guide
@@ -169,7 +169,7 @@ Choose `strategy` in `agent.yaml`:
 | `chat` | `builtin:chat` | Small talk (no retrieval) |
 | `refuse` | `builtin:refuse` | Out-of-scope (preset reply) |
 
-Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in `~/.customer-agent/handlers/<name>.py` — no need to fork the repo.
+Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in `~/.customer-helpmesh-agent/handlers/<name>.py` — no need to fork the repo.
 
 ### Architecture
 
@@ -197,7 +197,7 @@ Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in
               │  HTTP
               ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                    customer-agent  (FastAPI :8000)                         │
+│                    customer-helpmesh-agent  (FastAPI :8000)                         │
 │                                                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                      FastAPI  (server.py)                      │    │
@@ -220,7 +220,7 @@ Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in
 │   │  │  chat       — LLM direct (small-talk prompt)           │    │    │
 │   │  │  refuse     — preset reply (no LLM)                    │    │    │
 │   │  └───────────────────────────────────────────────────────┘    │    │
-│   │       │  custom:  ~/.customer-agent/handlers/<name>.py:build    │    │
+│   │       │  custom:  ~/.customer-helpmesh-agent/handlers/<name>.py:build    │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                              │                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │
@@ -360,7 +360,7 @@ npm install
 npm run dev
 ```
 
-The demo expects the agent API at `http://localhost:8000/chat`. Start the backend first with `customer-agent` (or `python -m agent.cli serve`).
+The demo expects the agent API at `http://localhost:8000/chat`. Start the backend first with `customer-helpmesh-agent` (or `python -m agent.cli serve`).
 
 ### Documentation
 
@@ -404,7 +404,7 @@ agent 本身不绑死任何业务领域，只提供可配置的 LLM + RAG + 工�
 | 检索策略 | `retriever.strategy: vector / hybrid / multiquery / hyde` | `agent.yaml` |
 | 意图 | `intents:` 列表（`builtin:*` 或自定义 handler 路径） | `agent.yaml` |
 | 业务 API | `tools:` 列表（endpoint + auth + 模板） | `agent.yaml` |
-| 自定义 Python 逻辑 | 把 `.py` 丢进 `~/.customer-agent/handlers/` | 文件系统 |
+| 自定义 Python 逻辑 | 把 `.py` 丢进 `~/.customer-helpmesh-agent/handlers/` | 文件系统 |
 | 可观测 | `langsmith.enabled: true` + `LANGSMITH_API_KEY` | `agent.yaml` + env |
 
 不改代码，不重新构建。改 yaml、重启、完成。
@@ -420,7 +420,7 @@ agent 本身不绑死任何业务领域，只提供可配置的 LLM + RAG + 工�
 - **真实用户上下文**：HTTP header 透传 `Authorization` + `X-User-Id` 给 tool 调用
 - **Token 级流式**：SSE 输出，前端逐字显示
 - **LangSmith 可观测**：trace + 评估 + 反馈
-- **自定义 handler 插件**：业务方把 .py 丢到 `~/.customer-agent/handlers/` 即可，无需 fork
+- **自定义 handler 插件**：业务方把 .py 丢到 `~/.customer-helpmesh-agent/handlers/` 即可，无需 fork
 - **开箱即用 chat-widget**：React + Tailwind 组件，可直接 copy 走
 - **BFF 示例**：Next.js / Express / FastAPI 模板
 
@@ -439,8 +439,8 @@ curl -N -X POST http://localhost:8000/chat \
 **Docker（推荐）**
 
 ```bash
-git clone https://github.com/colddew-yj/customer-agent
-cd customer-agent
+git clone https://github.com/colddew-yj/customer-helpmesh-agent
+cd customer-helpmesh-agent
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env       # 填 OPENAI_API_KEY
 docker compose up -d
@@ -454,7 +454,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env
-customer-agent                       # 默认 0.0.0.0:8000
+customer-helpmesh-agent                       # 默认 0.0.0.0:8000
 ```
 
 ### 30 分钟接入指南
@@ -536,7 +536,7 @@ OCR（tesseract）+ Vision LLM 兜底（`pdf_advanced`）处理扫描件 PDF 与
 | `chat` | `builtin:chat` | 闲聊（不检索） |
 | `refuse` | `builtin:refuse` | 无关问题（预设话术） |
 
-业务方在 `agent.yaml` `intents:` 增删改。自定义 handler 丢到 `~/.customer-agent/handlers/<name>.py` 即可，无需 fork 仓。
+业务方在 `agent.yaml` `intents:` 增删改。自定义 handler 丢到 `~/.customer-helpmesh-agent/handlers/<name>.py` 即可，无需 fork 仓。
 
 ### 架构
 
@@ -547,7 +547,7 @@ OCR（tesseract）+ Vision LLM 兜底（`pdf_advanced`）处理扫描件 PDF 与
 Next.js BFF（透传 Authorization + X-User-Id）
        │
        ▼  HTTP
-customer-agent (FastAPI)
+customer-helpmesh-agent (FastAPI)
        │
        ├─ LangGraph：classify → {faq | account | complaint | chat | refuse}
        │
@@ -609,7 +609,7 @@ npm install
 npm run dev
 ```
 
-演示页默认请求 `http://localhost:8000/chat`。先启动后端 `customer-agent`（或 `python -m agent.cli serve`）。
+演示页默认请求 `http://localhost:8000/chat`。先启动后端 `customer-helpmesh-agent`（或 `python -m agent.cli serve`）。
 
 ### 文档
 
@@ -645,7 +645,7 @@ npm run dev
               │  HTTP
               ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                    customer-agent（FastAPI :8000）                       │
+│                    customer-helpmesh-agent（FastAPI :8000）                       │
 │                                                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                      FastAPI（server.py）                     │    │
@@ -668,7 +668,7 @@ npm run dev
 │   │  │  chat       — LLM 直答（闲聊 prompt）                   │    │    │
 │   │  │  refuse     — 预设话术（不调 LLM）                     │    │    │
 │   │  └───────────────────────────────────────────────────────┘    │    │
-│   │       │  自定义：~/.customer-agent/handlers/<name>.py:build     │    │
+│   │       │  自定义：~/.customer-helpmesh-agent/handlers/<name>.py:build     │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                              │                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │

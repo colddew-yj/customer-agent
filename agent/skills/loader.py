@@ -1,7 +1,7 @@
 """
 V2: 自定义 handler 扫描。
 
-业务方写 `~/.customer-agent/handlers/order.py`，每个文件必须有 `build(ctx)` 函数，
+业务方写 `~/.customer-helpmesh-agent/handlers/order.py`，每个文件必须有 `build(ctx)` 函数，
 agent 启动时自动注册到 `CUSTOM_HANDLERS` 字典。
 
 agent.yaml 配置：
@@ -10,7 +10,7 @@ agent.yaml 配置：
       handler: handlers/order.py            # 相对 agent.yaml 的路径
       # 或绝对路径：
       # handler: /opt/biz/handlers/order.py
-      # 或文件名（自动从 ~/.customer-agent/handlers/ 找）：
+      # 或文件名（自动从 ~/.customer-helpmesh-agent/handlers/ 找）：
       # handler: order
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ def _default_search_paths() -> list[Path]:
     paths: list[Path] = []
     home = os.environ.get("HOME")
     if home:
-        paths.append(Path(home) / ".customer-agent" / "handlers")
+        paths.append(Path(home) / ".customer-helpmesh-agent" / "handlers")
     paths.append(Path.cwd() / "handlers")
     return paths
 

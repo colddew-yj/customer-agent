@@ -1,4 +1,4 @@
-# customer-agent 默认配置示例
+# customer-helpmesh-agent 默认配置示例
 # 复制为 agent.yaml 后修改
 
 llm:

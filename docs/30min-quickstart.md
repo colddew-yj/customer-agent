@@ -1,6 +1,6 @@
 # 30 分钟接入指南
 
-适用：要把 customer-agent 接入自家业务的开发者。
+适用：要把 customer-helpmesh-agent 接入自家业务的开发者。
 
 ## 第 1 步：准备知识文档（5 min）
 
@@ -66,5 +66,5 @@ curl -N -X POST http://localhost:8000/chat \
 - 文档改了重跑：`POST /ingest`，稳定 ID 跳过未变化 chunk
 - 新意图：agent.yaml `intents:` 加一条，handler 仅支持 builtin:faq/account/complaint/chat/refuse
 - rerank：`retriever.rerank: true` + `pip install -e ".[rerank]"`
-- 不接 Docker：`pip install -r requirements.txt && customer-agent`
+- 不接 Docker：`pip install -r requirements.txt && customer-helpmesh-agent`
 - SSO/OAuth：BFF 层做 token 交换，agent 不管 SSO
