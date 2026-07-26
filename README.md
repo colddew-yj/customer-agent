@@ -348,6 +348,17 @@ import { useChatStream } from "./chat-widget";
 const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId });
 ```
 
+### Known pitfalls (real-LLM gotchas)
+
+These were discovered only when running end-to-end with real providers (DeepSeek + DashScope + Chroma). Mock-LLM tests passed 41/41 but hid them.
+
+- **Python 3.14 incompatibility** — `tokenizers 0.20.3` fails to build on Python 3.14 (PyO3 caps at 3.13). Use Python 3.12. `python_requires = ">=3.11"` is wrong; this project actually requires `<=3.13`.
+- **`pip install -e .` is required** — running `python -m agent.cli` directly without editable install fails with `ModuleNotFoundError: No module named 'agent.knowledge'`. The agent/ package uses implicit-namespace packages; the editable install registers the console scripts (`customer-agent`, `customer-agent-ingest`).
+- **DashScope embedding must use `provider: dashscope`** — `provider: openai` with `base_url: dashscope.aliyuncs.com/compatible-mode/v1` fails with 400 (`Input to Embeddings is missing variables input.contents`) because the OpenAI client sends `input` array but the compatibility mode expects the DashScope SDK's `contents` field. Use the dedicated `dashscope` provider (uses `langchain_community.embeddings.DashScopeEmbeddings`).
+- **DashScope embedding model name** — `text-embedding-3-small` does not exist on DashScope. Use `text-embedding-v2` (or `text-embedding-v3` via the native dashscope SDK).
+- **rerank default-on requires FlagEmbedding** — `retriever.rerank: true` triggers `flag_retranker.py` import; missing package prints a warning and silently disables rerank, no crash. To actually rerank: `pip install FlagEmbedding sentence-transformers`. To explicitly disable: `retriever.rerank: false` in agent.yaml.
+- **`graph.py` classifier uses raw messages, not ChatPromptTemplate** — system prompt text with `{...}` placeholders (e.g. JSON example syntax) crashes langchain's prompt validation. The classifier builds `[SystemMessage, HumanMessage]` directly via `RunnableLambda`. If you customise `agent/skills/*` system prompts, avoid `{` in literals or you'll see `KeyError: '<varname>'`.
+
 ### Documentation
 
 - [30-minute quick start](docs/30min-quickstart.md)
@@ -582,6 +593,17 @@ import { ChatWidget } from "./chat-widget";
 import { useChatStream } from "./chat-widget";
 const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId });
 ```
+
+### 已知坑（真 LLM 实测暴露）
+
+以下只在端到端跑过真实 provider（DeepSeek + DashScope + Chroma）才发现，mock LLM 单测 41/41 全过也没暴露：
+
+- **Python 3.14 不兼容** —— `tokenizers 0.20.3` 在 Python 3.14 编译失败（PyO3 最高支持 3.13）。用 Python 3.12。`python_requires = ">=3.11"` 是错的，实际要求 `<=3.13`。
+- **必须 `pip install -e .`** —— 不装 editable 直接 `python -m agent.cli` 会 `ModuleNotFoundError: No module named 'agent.knowledge'`。agent/ 是 implicit namespace package，editable 安装注册 console scripts（`customer-agent`、`customer-agent-ingest`）。
+- **DashScope embedding 必须用 `provider: dashscope`** —— 用 `provider: openai` + `base_url: dashscope.aliyuncs.com/compatible-mode/v1` 会 400 报错（`Input to Embeddings is missing variables input.contents`），因为 OpenAI 客户端发 `input` 数组，兼容模式要 `contents` 字段。改用专门的 `dashscope` provider（走 `langchain_community.embeddings.DashScopeEmbeddings`）。
+- **DashScope embedding 模型名** —— `text-embedding-3-small` 在 DashScope 不存在。用 `text-embedding-v2`（或 `text-embedding-v3` 走原生 dashscope SDK）。
+- **rerank 默认开需装 FlagEmbedding** —— `retriever.rerank: true` 触发 `flag_retranker.py` import；缺包只打 warning 静默关闭 rerank，不崩。要真用 rerank：`pip install FlagEmbedding sentence-transformers`。要显式关：`agent.yaml` 里 `retriever.rerank: false`。
+- **`graph.py` classifier 用裸 messages 不用 ChatPromptTemplate** —— system prompt 文本里有 `{...}` 占位符（哪怕是 JSON 示例语法）会触发 langchain 模板校验崩溃。classifier 改用 `RunnableLambda` 直接拼 `[SystemMessage, HumanMessage]`。改 `agent/skills/*` 的 system prompt 时避免 `{` 字面量，否则会 `KeyError: '<varname>'`。
 
 ### 文档
 
