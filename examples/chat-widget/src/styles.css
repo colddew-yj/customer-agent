@@ -1,0 +1,30 @@
+/* customer-agent chat-widget 默认样式
+ * 业务方在自己 CSS 里覆盖同名 class 即可改样式。
+ */
+
+.ca-cw {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: #1f2937;
+}
+
+.ca-cw * {
+  box-sizing: border-box;
+}
+
+.ca-cw-header {
+  background-color: #2563eb;
+}
+
+.ca-cw-bubble {
+  word-break: break-word;
+}
+
+.ca-cw-input input:focus {
+  outline: none;
+}
+
+.dark .ca-cw {
+  background-color: #18181b;
+  color: #e4e4e7;
+}
