@@ -238,7 +238,51 @@ const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId 
 - [LLM providers](docs/llm-providers.md)
 - [Contributing](CONTRIBUTING.md)
 
-### License
+### Roadmap
+
+V1 (initial): config-driven core, 5 builtin intents, multi-format RAG, multi-LLM, SSE.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ V1  foundation                                                       │
+│ • 5 builtin intents: faq / account / complaint / chat / refuse      │
+│ • Multi-format loader: md / txt / pdf / html / csv / json           │
+│ • Hybrid retrieval: vector + BM25 (weighted ensemble)               │
+│ • LLM factory: openai / anthropic / deepseek / ollama / azure       │
+│ • SSE token streaming + FastAPI                                     │
+│ • Tool registry with template rendering                             │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ V2  retrieval + observability + plugins                             │
+│ • Retrieval strategies: vector / hybrid / multiquery / hyde         │
+│ • Fusion: RRF (Reciprocal Rank Fusion) + weighted                   │
+│ • BM25 chunks dump → runtime index (was empty in V1)                │
+│ • LangSmith: trace + Dataset + Evaluator (heuristic / llm-judge)    │
+│ • /feedback endpoint → LangSmith run                                │
+│ • Custom handler plugin: ~/.customer-agent/handlers/                │
+│ • PyMuPDFLoader fallback (double-column PDF + header-footer)         │
+│ • LangSmith observability integrated                                │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ V3  remote knowledge + multimodal + frontend                         │
+│ • Remote connectors: S3 / Git / Notion (boto3 + httpx)              │
+│ • docx / xlsx loaders (python-docx + openpyxl)                       │
+│ • OCR (tesseract) + Vision LLM fallback for scanned docs            │
+│ • Drop-in chat-widget: React + Tailwind (3 usage modes)             │
+│ • Cross-encoder reranker default-on (FlagEmbedding)                 │
+│ • Polyglot README (English + 中文)                                  │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+        (current: V3 ships; SaaS multi-tenant + realtime sync
+         deferred — see /plan and business-side feedback)
+```
+
+**License**
 
 [MIT](LICENSE)
 
@@ -472,6 +516,49 @@ const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId 
 - [工具配置](docs/tools.md)
 - [LLM providers](docs/llm-providers.md)
 - [贡献指南](CONTRIBUTING.md)
+
+### 技术路线
+
+V1（初版）：配置驱动核心、5 个内置意图、多格式 RAG、多 LLM、SSE 流。
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ V1  基础                                                              │
+│ • 5 个内置意图：faq / account / complaint / chat / refuse             │
+│ • 多格式 loader：md / txt / pdf / html / csv / json                  │
+│ • 混合检索：向量 + BM25（weighted ensemble）                         │
+│ • LLM factory：openai / anthropic / deepseek / ollama / azure        │
+│ • SSE token 流 + FastAPI                                             │
+│ • 工具注册表 + 模板渲染                                              │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ V2  检索增强 + 可观测 + 插件化                                       │
+│ • 检索策略：vector / hybrid / multiquery / hyde                      │
+│ • 融合：RRF（Reciprocal Rank Fusion）+ weighted                       │
+│ • BM25 chunks 落盘 → 运行时索引（V1 一直为空）                      │
+│ • LangSmith：trace + Dataset + Evaluator（heuristic / llm-judge）   │
+│ • /feedback 端点 → 写回 LangSmith run                                │
+│ • 自定义 handler 插件：~/.customer-agent/handlers/                   │
+│ • PyMuPDFLoader fallback（双栏 PDF + 页眉页脚过滤）                  │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ V3  远程知识库 + 多模态 + 前端组件                                   │
+│ • 远程 connector：S3 / Git / Notion（boto3 + httpx）                  │
+│ • docx / xlsx loader（python-docx + openpyxl）                       │
+│ • OCR（tesseract）+ Vision LLM 兜底，处理扫描件                       │
+│ • 开箱即用 chat-widget：React + Tailwind（3 种用法）                  │
+│ • Cross-encoder rerank 默认开（FlagEmbedding）                       │
+│ • README 双语（English + 中文）                                      │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+       （当前：V3 已发布；SaaS 多租户 + 实时增量同步
+         暂缓 —— 依据 /plan 与业务方真实反馈）
+```
 
 ### 许可证
 
