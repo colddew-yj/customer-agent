@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Runtime data
+data/
+checkpoints/
+traces/
+*.db
+*.sqlite
+*.sqlite3
+chroma/
+chroma_db/
+chroma_data/
+.ingest/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local knowledge (业务方挂的私人文档)
+knowledge/
+docs/
+
+# Build
+*.whl
+*.tar.gz

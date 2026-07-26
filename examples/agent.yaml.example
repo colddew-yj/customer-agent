@@ -1,0 +1,86 @@
+# customer-agent 默认配置示例
+# 复制为 agent.yaml 后修改
+
+llm:
+  provider: openai          # openai | anthropic | deepseek | ollama
+  model: gpt-4o-mini
+  base_url: null
+  api_key_env: OPENAI_API_KEY
+  temperature: 0.3
+
+embedding:
+  provider: openai
+  model: text-embedding-3-small
+  base_url: null
+  api_key_env: OPENAI_API_KEY
+
+vector_store:
+  provider: chroma
+  persist_dir: ./data/chroma
+  collection_name: knowledge
+
+retriever:
+  top_k: 5
+  fetch_k: 10
+  hybrid: true
+  rerank: false
+  bm25_tokenizer: jieba
+
+knowledge:
+  sources:
+    - name: faq
+      path: ./knowledge/faq
+      glob: "**/*.md"
+      format: md
+      chunk_size: 500
+      chunk_overlap: 50
+      metadata_tags: { category: faq }
+    - name: products
+      path: ./knowledge/products
+      glob: "**/*.pdf"
+      format: pdf
+      chunk_size: 800
+      chunk_overlap: 100
+      metadata_tags: { category: products }
+
+tools:
+  - name: query_balance
+    endpoint: https://api.example.com/v1/users/me/balance
+    method: GET
+    auth: bearer
+    auth_header: Authorization
+    response_path: data.balance
+
+intents:
+  - name: faq
+    handler: builtin:faq
+    description: 业务问答
+    uses_rag: true
+  - name: account
+    handler: builtin:account
+    description: 账户问题
+    uses_rag: false
+    uses_tools: [query_balance]
+  - name: complaint
+    handler: builtin:complaint
+    description: 用户不满
+    uses_rag: false
+  - name: chat
+    handler: builtin:chat
+    description: 闲聊
+    uses_rag: false
+  - name: refuse
+    handler: builtin:refuse
+    description: 跟业务无关
+    uses_rag: false
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  cors_origins: ["*"]
+  heartbeat_seconds: 15
+
+assistant_name: 客服助理
+brand_name: MyProduct
+
+refuse_message: 这个问题跟 {brand} 业务无关，我暂时帮不上忙。

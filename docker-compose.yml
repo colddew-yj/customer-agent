@@ -1,0 +1,23 @@
+services:
+  customer-agent:
+    build: .
+    image: customer-agent:latest
+    container_name: customer-agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./agent.yaml:/app/agent.yaml:ro
+      - ./knowledge:/app/knowledge:ro
+      - ./data/chroma:/app/data/chroma
+      - ./data/checkpoints:/app/data/checkpoints
+    environment:
+      - AGENT_CONFIG_PATH=/app/agent.yaml
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
