@@ -21,4 +21,9 @@ def build_embedding(cfg: EmbeddingConfig) -> Embeddings:
     if cfg.provider == "ollama":
         from langchain_ollama import OllamaEmbeddings
         return OllamaEmbeddings(base_url=cfg.base_url or "http://localhost:11434", model=cfg.model)
+    if cfg.provider == "fake":
+        # 测试 / dev：deterministic random vector（无需 API key）
+        from langchain_community.embeddings import FakeEmbeddings
+        dim = int(os.environ.get("FAKE_EMB_DIM", "1536"))
+        return FakeEmbeddings(size=dim)
     raise ValueError(f"未实现的 embedding provider: {cfg.provider}")

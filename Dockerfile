@@ -14,8 +14,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-ENV PIP_INDEX_URL=http://mirrors.cloud.aliyuncs.com/pypi/simple/ \
-    PIP_TRUSTED_HOST=mirrors.cloud.aliyuncs.com \
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 

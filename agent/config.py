@@ -119,8 +119,9 @@ class AgentConfig(BaseModel):
 # 加载器
 # ──────────────────────────────────────────────────────────────────────
 
-_CONFIG_PATH = Path(os.environ.get("AGENT_CONFIG_PATH", "./agent.yaml"))
-_ENV_PATH = Path(os.environ.get("AGENT_ENV_PATH", "./.env"))
+# 注：路径在 load() 内每次读 env，方便测试切换。
+_DEFAULT_CONFIG_PATH = "./agent.yaml"
+_DEFAULT_ENV_PATH = "./.env"
 
 
 def _resolve_yaml(path: Path) -> dict:
@@ -135,8 +136,9 @@ def _resolve_yaml(path: Path) -> dict:
 
 def _resolve_env() -> None:
     """加载 .env（如果有）。业务方密钥走 env，不入 agent.yaml。"""
-    if _ENV_PATH.is_file():
-        load_dotenv(_ENV_PATH)
+    env_path = Path(os.environ.get("AGENT_ENV_PATH", _DEFAULT_ENV_PATH))
+    if env_path.is_file():
+        load_dotenv(env_path)
 
 
 def _inject_api_keys(cfg: AgentConfig) -> AgentConfig:
@@ -183,10 +185,11 @@ def _validate(cfg: AgentConfig, cfg_path: Path) -> None:
 def load() -> AgentConfig:
     """主入口：加载 + 校验 + 注入密钥。"""
     _resolve_env()
-    raw = _resolve_yaml(_CONFIG_PATH)
+    config_path = Path(os.environ.get("AGENT_CONFIG_PATH", _DEFAULT_CONFIG_PATH))
+    raw = _resolve_yaml(config_path)
     cfg = AgentConfig(**raw)
     _inject_api_keys(cfg)
-    _validate(cfg, _CONFIG_PATH)
+    _validate(cfg, config_path)
     return cfg
 
 

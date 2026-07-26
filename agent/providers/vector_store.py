@@ -9,7 +9,11 @@ from ..config import VectorStoreConfig
 
 def build_vector_store(cfg: VectorStoreConfig, embedding: Embeddings) -> VectorStore:
     if cfg.provider == "chroma":
-        from langchain_chroma import Chroma
+        # 兼容新 (langchain_chroma) / 老 (langchain_community.vectorstores.Chroma) 包名
+        try:
+            from langchain_chroma import Chroma
+        except ImportError:
+            from langchain_community.vectorstores import Chroma
         return Chroma(
             collection_name=cfg.collection_name,
             embedding_function=embedding,

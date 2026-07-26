@@ -46,7 +46,16 @@ def build_llm(cfg: LLMConfig) -> BaseChatModel:
             base_url=cfg.base_url or "http://localhost:11434",
             **common,
         )
+    if cfg.provider == "fake":
+        # 测试 / dev：固定回复。classifier JSON 也走同一 LLM（每次 invoke 循环 responses）
+        from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+        from langchain_core.messages import AIMessage
+        return FakeMessagesListChatModel(responses=[
+            AIMessage(content='{"intent": "faq", "confidence": 0.9}'),
+            AIMessage(content="这是一个 fake 测试回复。"),
+            AIMessage(content="这是第二条 fake 回复。"),
+        ])
     raise ValueError(
         f"未实现的 LLM provider: {cfg.provider}\n"
-        f"可选: openai | anthropic | deepseek | ollama"
+        f"可选: openai | anthropic | deepseek | ollama | fake"
     )
