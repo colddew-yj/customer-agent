@@ -57,6 +57,9 @@ class RetrieverConfig(BaseModel):
     fusion: str = "rrf"                   # rrf | weighted
     bm25_chunks_path: str = "./data/bm25_chunks.pkl"
     bm25_tokenizer: str = "jieba"         # jieba | whitespace
+    rerank: bool = True                   # V3: 默认开（cross-encoder 精排 top_k 候选）
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    rerank_top_n: int = 20                # 召回多少候选送 reranker
     multi_query: MultiQueryConfig = MultiQueryConfig()
     hyde: HydeConfig = HydeConfig()
 

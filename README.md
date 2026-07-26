@@ -15,7 +15,7 @@
 
 A **general-purpose customer service agent** — one binary that adapts to many scenarios through configuration, not code changes.
 
-### What "general-purpose" means
+### Use cases
 
 The same agent serves any customer service domain by swapping its `agent.yaml`:
 
@@ -42,7 +42,7 @@ The configuration is the product:
 
 No code changes. No rebuild. Edit YAML, restart, done.
 
-### Why use customer-agent
+### Features
 
 - **Config-driven** — switch LLM / knowledge / intents / tools through `agent.yaml`
 - **Multiple knowledge sources** — local files, S3, Git repos, Notion databases
@@ -248,11 +248,11 @@ const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId 
 
 ## 中文
 
-一个**通用客服 agent** —— 同一份代码，靠配置适配各种客服场景，不改业务代码。
+通用客服 agent —— 同一份代码，靠配置适配各种客服场景。
 
-### 为什么是"通用"
+### 适用场景
 
-agent 本身不绑死任何业务领域，只提供一个可配置的 LLM + RAG + 工具调用框架。不同场景换 `agent.yaml` 即可：
+agent 本身不绑死任何业务领域，只提供可配置的 LLM + RAG + 工具调用框架。不同场景换 `agent.yaml` 即可：
 
 - **电商客服** — 退换货 / 物流 / 库存 FAQ
 - **SaaS 技术支持** — API 报错 / SDK 用法 / 限流排查
@@ -261,7 +261,7 @@ agent 本身不绑死任何业务领域，只提供一个可配置的 LLM + RAG 
 - **企业内部 IT / HR** — 请假政策 / 工单路由 / 密码重置
 - **自定义场景** — 丢文档、配工具、定义意图就行
 
-**配置即产品**：
+配置即产品：
 
 | 维度 | 怎么换 | 位置 |
 |---|---|---|

@@ -25,6 +25,9 @@ retriever:
   fetch_k: 10
   fusion: rrf                # 当 strategy=hybrid：rrf | weighted
   bm25_tokenizer: jieba
+  rerank: true               # V3 默认开 cross-encoder 精排（需要 FlagEmbedding）
+  rerank_model: BAAI/bge-reranker-v2-m3
+  rerank_top_n: 20           # 召回多少候选送 reranker
   multi_query: { n_variants: 3 }
   hyde: { enabled: false }
 
