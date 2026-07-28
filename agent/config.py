@@ -16,7 +16,6 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Pydantic schema: agent.yaml 字段定义
 # ──────────────────────────────────────────────────────────────────────
@@ -50,6 +49,11 @@ class HydeConfig(BaseModel):
     enabled: bool = False
 
 
+class QueryRewriteConfig(BaseModel):
+    enabled: bool = True
+    max_rewrites: int = 2
+
+
 class RetrieverConfig(BaseModel):
     strategy: str = "hybrid"               # vector | hybrid | multiquery | hyde
     top_k: int = 5
@@ -62,6 +66,7 @@ class RetrieverConfig(BaseModel):
     rerank_top_n: int = 20                # 召回多少候选送 reranker
     multi_query: MultiQueryConfig = MultiQueryConfig()
     hyde: HydeConfig = HydeConfig()
+    query_rewrite: QueryRewriteConfig = QueryRewriteConfig()
 
 
 class KnowledgeSourceConfig(BaseModel):

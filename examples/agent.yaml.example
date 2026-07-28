@@ -36,6 +36,7 @@ retriever:
   rerank_top_n: 20           # 召回多少候选送 reranker
   multi_query: { n_variants: 3 }
   hyde: { enabled: false }
+  query_rewrite: { enabled: true, max_rewrites: 2 }
 
 knowledge:
   sources:

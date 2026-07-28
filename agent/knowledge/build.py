@@ -22,6 +22,7 @@ from .bm25 import build_bm25_retriever
 from .fusion import rrf as rrf_fusion
 from .fusion import weighted as weighted_fusion
 from .hyde import HydeRetriever
+from .query_rewrite import QueryRewriteRetriever
 from .reranker import maybe_wrap_with_rerank
 
 
@@ -40,58 +41,52 @@ def build_retriever(
     llm: BaseChatModel | None = None,
 ) -> BaseRetriever:
     """按 strategy 组装 retriever。"""
-    vector_retriever = vector_store.as_retriever(search_kwargs={"k": cfg.top_k})
+    candidate_k = max(cfg.top_k, cfg.fetch_k, cfg.rerank_top_n)
+    vector_retriever = vector_store.as_retriever(search_kwargs={"k": candidate_k})
 
-    if cfg.strategy == "vector":
+    def finish(retriever: BaseRetriever) -> BaseRetriever:
+        if cfg.query_rewrite.enabled:
+            if llm is None:
+                raise ValueError("query_rewrite 需要 llm")
+            retriever = QueryRewriteRetriever(
+                base=retriever,
+                llm=llm,
+                max_rewrites=cfg.query_rewrite.max_rewrites,
+            )
         return maybe_wrap_with_rerank(
-            vector_retriever,
+            retriever,
             cfg_rerank_enabled=cfg.rerank,
             rerank_model=cfg.rerank_model,
             rerank_top_n=cfg.top_k,
-            fetch_k=cfg.rerank_top_n,
+            fetch_k=candidate_k,
         )
+
+    if cfg.strategy == "vector":
+        return finish(vector_retriever)
 
     if cfg.strategy == "hyde":
         if llm is None:
             raise ValueError("hyde strategy 需要 llm")
-        hyde = HydeRetriever(llm=llm, vector_store=vector_store, top_k=cfg.rerank_top_n)
-        return maybe_wrap_with_rerank(
-            hyde,
-            cfg_rerank_enabled=cfg.rerank,
-            rerank_model=cfg.rerank_model,
-            rerank_top_n=cfg.top_k,
-            fetch_k=cfg.rerank_top_n,
-        )
+        hyde = HydeRetriever(llm=llm, vector_store=vector_store, top_k=candidate_k)
+        return finish(hyde)
 
     if cfg.strategy == "multiquery":
         if llm is None:
             raise ValueError("multiquery strategy 需要 llm")
         from langchain.retrievers.multi_query import MultiQueryRetriever
         mq = MultiQueryRetriever.from_llm(retriever=vector_retriever, llm=llm)
-        return maybe_wrap_with_rerank(
-            mq,
-            cfg_rerank_enabled=cfg.rerank,
-            rerank_model=cfg.rerank_model,
-            rerank_top_n=cfg.top_k,
-            fetch_k=cfg.rerank_top_n,
-        )
+        return finish(mq)
 
     if cfg.strategy == "hybrid":
         bm25_chunks = _load_bm25_chunks(cfg.bm25_chunks_path)
-        bm25 = build_bm25_retriever(bm25_chunks, k=cfg.rerank_top_n, tokenizer=cfg.bm25_tokenizer)
+        bm25 = build_bm25_retriever(bm25_chunks, k=candidate_k, tokenizer=cfg.bm25_tokenizer)
         retrievers = [vector_retriever, bm25]
         weights = [0.7, 0.3]
         if cfg.fusion == "rrf":
-            hybrid = rrf_fusion(retrievers, weights, k_final=cfg.rerank_top_n)
+            hybrid = rrf_fusion(retrievers, weights, k_final=candidate_k)
         else:
-            hybrid = weighted_fusion(retrievers, weights)
-        return maybe_wrap_with_rerank(
-            hybrid,
-            cfg_rerank_enabled=cfg.rerank,
-            rerank_model=cfg.rerank_model,
-            rerank_top_n=cfg.top_k,
-            fetch_k=cfg.rerank_top_n,
-        )
+            hybrid = weighted_fusion(retrievers, weights, k_final=candidate_k)
+        return finish(hybrid)
 
     raise ValueError(
         f"未知 retriever strategy: {cfg.strategy}\n"

@@ -71,7 +71,7 @@ def maybe_wrap_with_rerank(
         return retriever
     try:
         reranker = CrossEncoderReranker(model_name=rerank_model)
-    except RuntimeError as e:
+    except (ImportError, OSError, RuntimeError) as e:
         print(f"[rerank] {e}，跳过（仍用原 retriever）")
         return retriever
     return RerankRetriever(
