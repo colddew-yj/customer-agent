@@ -76,6 +76,7 @@ git clone https://github.com/colddew-yj/customer-helpmesh-agent
 cd customer-helpmesh-agent
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env       # fill in your OPENAI_API_KEY
+mkdir -p knowledge/faq && echo "# 业务 FAQ" > knowledge/faq/index.md
 docker compose up -d
 curl -X POST http://localhost:8000/ingest
 ```
@@ -443,6 +444,7 @@ git clone https://github.com/colddew-yj/customer-helpmesh-agent
 cd customer-helpmesh-agent
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env       # 填 OPENAI_API_KEY
+mkdir -p knowledge/faq && echo "# 业务 FAQ" > knowledge/faq/index.md
 docker compose up -d
 curl -X POST http://localhost:8000/ingest
 ```

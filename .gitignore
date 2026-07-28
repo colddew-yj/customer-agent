@@ -22,6 +22,9 @@ htmlcov/
 .env.*.local
 *.pem
 
+# Local agent config (cp from examples/agent.yaml.example, dev-only)
+agent.yaml
+
 # Runtime data
 data/
 checkpoints/
