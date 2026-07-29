@@ -105,6 +105,7 @@ class IntentConfig(BaseModel):
     prompt_file: str | None = None
     uses_rag: bool = True
     uses_tools: list[str] = Field(default_factory=list)
+    toolset: str | None = None              # LangChain @tool 集合；由 LLM 自主选择具体 Tool
 
 
 class ServerConfig(BaseModel):

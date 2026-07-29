@@ -12,16 +12,19 @@ from __future__ import annotations
 
 import json
 
+from langchain_core.messages import SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.prebuilt import ToolNode, tools_condition
 
 from .config import AgentConfig
 from .providers import build_embedding, build_llm, build_vector_store
 from .skills.registry import build_handler
 from .skills.state import GraphState
 from .tools.registry import ToolRegistry
+from .tools.loader import discover_toolsets, load_toolset
 
 
 def _build_classifier(cfg: AgentConfig, llm):
@@ -60,8 +63,38 @@ def _build_classifier(cfg: AgentConfig, llm):
     return classify
 
 
+def _build_tool_loop(llm, tools, cfg: AgentConfig, intent):
+    """构建标准 LangChain Tool Calling 子图。
+
+    模型负责选择 Tool；ToolNode 负责执行；tools_condition 负责循环。
+    """
+    llm_with_tools = llm.bind_tools(tools)
+    system = (
+        f"你是 {cfg.brand_name} 的 {cfg.assistant_name}。\n"
+        f"当前业务领域：{intent.description}\n"
+        "优先使用可用 Tool 获取事实，不要编造实时数据。"
+    )
+
+    def call_model(state: GraphState) -> dict:
+        messages = [SystemMessage(content=system), *state.get("messages", [])]
+        response = llm_with_tools.invoke(messages)
+        output: dict = {"messages": [response]}
+        if not getattr(response, "tool_calls", None) and response.content:
+            output["answer"] = response.content
+        return output
+
+    builder = StateGraph(GraphState)
+    builder.add_node("agent", call_model)
+    builder.add_node("tools", ToolNode(tools))
+    builder.add_edge(START, "agent")
+    builder.add_conditional_edges("agent", tools_condition)
+    builder.add_edge("tools", "agent")
+    return builder.compile()
+
+
 def build_graph(cfg: AgentConfig, checkpointer=None):
     """从 AgentConfig 编译 LangGraph。"""
+    discover_toolsets()
     llm = build_llm(cfg.llm)
     embedding = build_embedding(cfg.embedding)
     vector_store = build_vector_store(cfg.vector_store, embedding)
@@ -75,7 +108,7 @@ def build_graph(cfg: AgentConfig, checkpointer=None):
         llm=llm,
     )
 
-    tools = ToolRegistry(cfg.tools)
+    legacy_tools = ToolRegistry(cfg.tools)
 
     builder = StateGraph(GraphState)
     classify_node = _build_classifier(cfg, llm)
@@ -85,11 +118,17 @@ def build_graph(cfg: AgentConfig, checkpointer=None):
         ctx = {
             "llm": llm,
             "retriever": retriever,
-            "tools": tools,
+            "tools": legacy_tools,
             "config": cfg,
             "intent_cfg": it,
         }
-        builder.add_node(it.name, build_handler(it.handler, ctx))
+        if it.toolset:
+            builder.add_node(
+                it.name,
+                _build_tool_loop(llm, load_toolset(it.toolset), cfg, it),
+            )
+        else:
+            builder.add_node(it.name, build_handler(it.handler, ctx))
 
     builder.add_edge(START, "classify")
 

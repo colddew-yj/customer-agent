@@ -1,7 +1,8 @@
-"""
-LangGraph state。节点间共享 dict。
-"""
-from typing import TypedDict
+"""LangGraph state。节点间共享消息和请求上下文。"""
+from typing import Annotated, TypedDict
+
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
 
 
 class GraphState(TypedDict, total=False):
@@ -16,6 +17,6 @@ class GraphState(TypedDict, total=False):
     user_id: str
     account_data: dict      # tool 调用结果
     tool_results: list
-    messages: list          # LangGraph checkpointer 多轮
+    messages: Annotated[list[AnyMessage], add_messages]
     confidence: float
     refused_reason: str

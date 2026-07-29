@@ -24,7 +24,7 @@ The same agent serves any customer service domain by swapping its `agent.yaml`:
 - **Banking / insurance** — account queries, policy lookup, complaint triage (all through your own APIs)
 - **Education / training** — curriculum Q&A, assignment help, scheduling
 - **Internal IT / HR** — leave policies, ticket routing, password resets
-- **Custom domains** — drop your knowledge files in, wire your APIs to `tools:`, define your intents
+- **Custom domains** — add knowledge files, define `@tool` business capabilities, bind a `toolset`, and define intents
 
 The configuration is the product:
 
@@ -36,15 +36,16 @@ The configuration is the product:
 | Document formats | `format: md / pdf / docx / xlsx / pdf_advanced / ...` per source | `agent.yaml` |
 | Retrieval strategy | `retriever.strategy: vector / hybrid / multiquery / hyde` | `agent.yaml` |
 | Intents (FAQ / account / complaint / ...) | `intents:` list with `builtin:*` or custom handler paths | `agent.yaml` |
-| Business APIs | `tools:` list with endpoint + auth + templates | `agent.yaml` |
+| AI-selected business capabilities | Python `@tool` files + `intent.toolset` | `agent/tools/` + `agent.yaml` |
+| Legacy fixed API calls | `tools:` list with endpoint + auth + templates | `agent.yaml` |
 | Custom Python behavior | drop a `.py` file in `~/.customer-helpmesh-agent/handlers/` | filesystem |
 | Observability | `langsmith.enabled: true` + `LANGSMITH_API_KEY` | `agent.yaml` + env |
 
-No code changes. No rebuild. Edit YAML, restart, done.
+Knowledge-only changes need no code changes: edit YAML, ingest, and restart. A new real-time business capability needs one trusted Python `@tool` wrapper, then only YAML binding and a restart.
 
 ### Features
 
-- **Config-driven** — switch LLM / knowledge / intents / tools through `agent.yaml`
+- **Config-driven** — switch LLM / knowledge / intents / toolsets through `agent.yaml`; business capabilities are standard LangChain `@tool`s
 - **Multiple knowledge sources** — local files, S3, Git repos, Notion databases
 - **Multi-format documents** — md / txt / pdf / html / csv / json / jsonl / docx / xlsx
 - **OCR + Vision fallback** — scanned PDFs and image-only content still get indexed
@@ -85,11 +86,15 @@ curl -X POST http://localhost:8000/ingest
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
+# 重排默认开；不装 FlagEmbedding 时启动 warning 跳过，仍可跑：
+pip install -e ".[rerank]"
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env
 customer-helpmesh-agent                       # listens on 0.0.0.0:8000
 ```
+
+`.[rerank]` 会拉 `FlagEmbedding`（~50 MB wheel）+ 首次启动自动下载 `BAAI/bge-reranker-v2-m3` 模型权重（~2 GB）到 `~/.cache/huggingface/`。
 
 ### 30-minute integration guide
 
@@ -172,6 +177,75 @@ Choose `strategy` in `agent.yaml`:
 
 Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in `~/.customer-helpmesh-agent/handlers/<name>.py` — no need to fork the repo.
 
+### Add a business capability (recommended Tool path)
+
+From the integrator's perspective, a new business concept usually consists of:
+
+```text
+knowledge source + intent + optional Toolset
+```
+
+Use only a knowledge source when the agent needs to answer from documents. Add a Tool when the answer requires live, user-specific data such as balance, orders, usage, or shipment status.
+
+#### 1. Add a read-only LangChain Tool
+
+Create a module under the trusted directory `agent/tools/`. The module name becomes the Toolset name:
+
+```python
+# agent/tools/logistics.py
+from langchain_core.tools import tool
+
+@tool
+def query_tracking(tracking_no: str) -> dict:
+    """Query the current status and history of a shipment."""
+    # Call your business backend here.
+    # Read Authorization / user context from injected state when needed.
+    return {"tracking_no": tracking_no, "status": "in_transit"}
+
+TOOLS = [query_tracking]
+READ_ONLY = True
+```
+
+The Tool implementation is the only place that knows how to call your business system. Keep credentials in environment variables; do not put tokens in the Tool file or `agent.yaml`.
+
+#### 2. Bind the Toolset to an intent
+
+```yaml
+intents:
+  - name: logistics
+    handler: builtin:chat
+    description: Shipment tracking, delivery status, and logistics questions
+    uses_rag: true
+    toolset: logistics
+```
+
+`toolset: logistics` exposes the whole domain collection to the model. The model chooses the concrete Tool; you do not need to list `query_tracking` in YAML.
+
+#### 3. Restart and verify
+
+Tool discovery runs at startup. After adding the module:
+
+```bash
+customer-helpmesh-agent
+```
+
+Ask a matching question and verify that the Tool is called with the user's forwarded context (`Authorization`, `X-User-Id`). Knowledge-only changes still require `POST /ingest` when documents change.
+
+#### What you do not need to change
+
+When adding a normal read-only business capability, do not modify:
+
+- `agent/graph.py`
+- LangGraph `ToolNode` or `tools_condition`
+- the LLM provider integration
+- one YAML endpoint entry per Tool
+
+The current legacy `tools:` endpoint configuration remains supported for existing agents, but it is fixed API wiring. The recommended path above uses LangChain Tool Calling: `@tool → bind_tools → AIMessage.tool_calls → ToolNode`.
+
+#### Safety boundary
+
+The automatic discovery directory is fixed and trusted. Import errors, missing `TOOLS`, duplicate Tool names, invalid Tool objects, or non-read-only modules stop startup instead of being silently ignored. Refunds, cancellations, address changes, and other write operations are not automatically enabled; they need a later confirmation or approval flow.
+
 ### Architecture
 
 ```
@@ -216,7 +290,7 @@ Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in
 │   │  ┌───────────────────────────────────────────────────────┐    │    │
 │   │  │ Intent Handlers (skills/ — 5 builtin + custom)        │    │    │
 │   │  │  faq        — RAG → answer                             │    │    │
-│   │  │  account    — ToolRegistry.invoke(...) → answer         │    │    │
+│   │  │  account    — Tool-enabled agent → answer               │    │    │
 │   │  │  complaint  — LLM direct (empathy prompt)             │    │    │
 │   │  │  chat       — LLM direct (small-talk prompt)           │    │    │
 │   │  │  refuse     — preset reply (no LLM)                    │    │    │
@@ -248,10 +322,10 @@ Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in
 │   └────────────────────────────────────────────────────────────────┘    │
 │                              │                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │
-│   │                  ToolRegistry  (tools/registry.py)             │    │
-│   │  • HTTP call with bearer / header:X-Name / none auth          │    │
-│   │  • Template rendering ({{user_token}} / {{user_id}} / ...)      │    │
-│   │  • Response path extraction (e.g. data.balance)                │    │
+│   │             LangChain Toolsets + ToolRegistry                 │    │
+│   │  • @tool modules in agent/tools/ auto-discovered at startup    │    │
+│   │  • LLM selects tools → ToolNode executes → graph loops        │    │
+│   │  • Legacy ToolRegistry remains for fixed API configuration     │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                              │                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │
@@ -268,8 +342,8 @@ Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in
 │   │  • llm / embedding / vector_store                              │    │
 │   │  • retriever (strategy / fusion / rerank)                      │    │
 │   │  • knowledge.sources[].connector / format / ocr / vision_llm   │    │
-│   │  • tools[] (endpoint / auth / request_template)                │    │
-│   │  • intents[].handler (builtin:xxx | path.py:build)             │    │
+│   │  • tools[] (legacy endpoint / auth / request_template)         │    │
+│   │  • intents[].handler + intents[].toolset                      │    │
 │   │  • server (cors / heartbeat)                                   │    │
 │   │  • langsmith.evaluation (dataset_name / evaluators)             │    │
 │   └────────────────────────────────────────────────────────────────┘    │
@@ -278,13 +352,13 @@ Add or remove intents in `agent.yaml`'s `intents:` list. Drop custom handlers in
               │                              │
               ▼                              ▼
 ┌──────────────────────────┐   ┌────────────────────────────────────────────┐
-│   LLM Providers (业务方) │   │   Observability (optional)                  │
+│   LLM Providers (your account) │   │   Observability (optional)            │
 │   • OpenAI                │   │   • LangSmith SaaS (client + dataset)     │
 │   • Anthropic             │   │   • Local JSONL trace                      │
 │   • DeepSeek              │   │   • LLM-as-judge evaluator                 │
 │   • Ollama (local)        │   └────────────────────────────────────────────┘
 │   • Azure OpenAI          │
-│   业务方自己 key / 自己付 │    ┌────────────────────────────────────────────┐
+│   由部署者提供 key / 付费 │    ┌────────────────────────────────────────────┐
 └──────────────────────────┘   │   Storage (per agent instance)              │
                               │   • ./data/chroma (vector store)            │
                               │   • ./data/bm25_chunks.pkl (BM25 chunks)     │
@@ -392,7 +466,7 @@ agent 本身不绑死任何业务领域，只提供可配置的 LLM + RAG + 工�
 - **银行 / 保险** — 账户查询 / 保单检索 / 投诉分流（接自家 API）
 - **教育 / 培训** — 课程答疑 / 作业辅助
 - **企业内部 IT / HR** — 请假政策 / 工单路由 / 密码重置
-- **自定义场景** — 丢文档、配工具、定义意图就行
+- **自定义场景** — 增加知识文档、定义 `@tool` 业务能力、绑定 Toolset、配置意图
 
 配置即产品：
 
@@ -404,15 +478,16 @@ agent 本身不绑死任何业务领域，只提供可配置的 LLM + RAG + 工�
 | 文档格式 | `format: md / pdf / docx / xlsx / pdf_advanced / ...` | `agent.yaml` |
 | 检索策略 | `retriever.strategy: vector / hybrid / multiquery / hyde` | `agent.yaml` |
 | 意图 | `intents:` 列表（`builtin:*` 或自定义 handler 路径） | `agent.yaml` |
-| 业务 API | `tools:` 列表（endpoint + auth + 模板） | `agent.yaml` |
+| AI 自主选择的业务能力 | Python `@tool` 文件 + `intent.toolset` | `agent/tools/` + `agent.yaml` |
+| 旧版固定 API 调用 | `tools:` 列表（endpoint + auth + 模板） | `agent.yaml` |
 | 自定义 Python 逻辑 | 把 `.py` 丢进 `~/.customer-helpmesh-agent/handlers/` | 文件系统 |
 | 可观测 | `langsmith.enabled: true` + `LANGSMITH_API_KEY` | `agent.yaml` + env |
 
-不改代码，不重新构建。改 yaml、重启、完成。
+只增加知识源时不需要改代码：修改 YAML、入库、重启即可。增加实时业务能力时，需要新增一个受信任的 Python `@tool` 封装，再配置 YAML 并重启。
 
 ### 特性
 
-- **配置驱动**：通过 `agent.yaml` 切换 LLM / 知识源 / 意图 / 工具，无需改代码
+- **配置驱动**：通过 `agent.yaml` 切换 LLM / 知识源 / 意图 / Toolset；真实业务能力使用标准 LangChain `@tool`
 - **多知识源**：本地目录、S3 兼容存储、Git 仓库、Notion database
 - **多格式文档**：md / txt / pdf / html / csv / json / jsonl / docx / xlsx
 - **OCR + Vision 兜底**：扫描件 PDF / 图片内容也能入库
@@ -421,7 +496,7 @@ agent 本身不绑死任何业务领域，只提供可配置的 LLM + RAG + 工�
 - **真实用户上下文**：HTTP header 透传 `Authorization` + `X-User-Id` 给 tool 调用
 - **Token 级流式**：SSE 输出，前端逐字显示
 - **LangSmith 可观测**：trace + 评估 + 反馈
-- **自定义 handler 插件**：业务方把 .py 丢到 `~/.customer-helpmesh-agent/handlers/` 即可，无需 fork
+- **自定义 handler 插件**：项目维护者把 .py 放到 `~/.customer-helpmesh-agent/handlers/` 即可，无需 fork
 - **开箱即用 chat-widget**：React + Tailwind 组件，可直接 copy 走
 - **BFF 示例**：Next.js / Express / FastAPI 模板
 
@@ -453,11 +528,15 @@ curl -X POST http://localhost:8000/ingest
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
+# 重排默认开；不装 FlagEmbedding 时启动 warning 跳过，仍可跑：
+pip install -e ".[rerank]"
 cp examples/agent.yaml.example agent.yaml
 cp examples/.env.example .env
 customer-helpmesh-agent                       # 默认 0.0.0.0:8000
 ```
+
+`.[rerank]` 会拉 `FlagEmbedding`（~50 MB wheel）+ 首次启动自动下载 `BAAI/bge-reranker-v2-m3` 模型权重（~2 GB）到 `~/.cache/huggingface/`。
 
 ### 30 分钟接入指南
 
@@ -538,7 +617,82 @@ OCR（tesseract）+ Vision LLM 兜底（`pdf_advanced`）处理扫描件 PDF 与
 | `chat` | `builtin:chat` | 闲聊（不检索） |
 | `refuse` | `builtin:refuse` | 无关问题（预设话术） |
 
-业务方在 `agent.yaml` `intents:` 增删改。自定义 handler 丢到 `~/.customer-helpmesh-agent/handlers/<name>.py` 即可，无需 fork 仓。
+项目维护者在 `agent.yaml` 的 `intents:` 中增删改意图。自定义 handler 放到 `~/.customer-helpmesh-agent/handlers/<name>.py` 即可，无需 fork 仓库。
+
+### 新增业务能力（推荐的 Tool 接入方式）
+
+从接入者角度，一个新的业务概念通常由以下部分组成：
+
+```text
+知识源 + 意图 + 可选 Toolset
+```
+
+如果只是让 Agent 根据业务文档回答问题，只需要增加知识源。如果需要查询用户实时数据，例如余额、订单、用量、物流状态，则需要增加 LangChain Tool。
+
+#### 1. 增加只读 LangChain Tool
+
+在受信目录 `agent/tools/` 下创建 Python 文件。文件名会成为 Toolset 名称：
+
+```python
+# agent/tools/logistics.py
+from langchain_core.tools import tool
+
+@tool
+def query_tracking(tracking_no: str) -> dict:
+    """查询物流单号的当前状态和轨迹。"""
+    # 在这里调用你的后端 API
+    # 需要时从注入的 state 中读取用户身份和 token
+    return {"tracking_no": tracking_no, "status": "运输中"}
+
+TOOLS = [query_tracking]
+READ_ONLY = True
+```
+
+Tool 内部负责适配业务系统。密钥放在环境变量中，不要写入 Tool 文件或 `agent.yaml`。
+
+#### 2. 把 Toolset 绑定到意图
+
+```yaml
+intents:
+  - name: logistics
+    handler: builtin:chat
+    description: 物流、配送、运输轨迹和签收状态
+    uses_rag: true
+    toolset: logistics
+```
+
+`toolset: logistics` 表示该意图可以使用整个物流能力集合。具体调用哪个 Tool 由 LLM 根据用户问题决定，不需要在 YAML 中逐个列出 `query_tracking`。
+
+#### 3. 重启并验证
+
+Tool 在服务启动时自动发现。增加文件后重启：
+
+```bash
+customer-helpmesh-agent
+```
+
+然后发送匹配的业务问题，检查 Tool 是否收到正确的用户上下文（`Authorization`、`X-User-Id`）。知识文档发生变化时，仍需要执行：
+
+```bash
+curl -X POST http://localhost:8000/ingest
+```
+
+#### 新增普通只读业务能力时，不需要修改
+
+- `agent/graph.py`
+- LangGraph `ToolNode` 或 `tools_condition`
+- LLM provider 集成
+- 每个 Tool 对应一条 YAML endpoint 配置
+
+现有 `tools:` endpoint 配置仍保留，用于兼容旧 Agent；它本质上是固定 API wiring。推荐的新方式使用标准 LangChain Tool Calling：
+
+```text
+@tool → bind_tools → AIMessage.tool_calls → ToolNode
+```
+
+#### 安全边界
+
+自动发现只扫描固定受信目录。模块导入失败、缺少 `TOOLS`、Tool 名重复、Tool 类型无效，或者不是只读 Tool 时，服务会启动失败，不会静默跳过。退款、取消订单、修改地址等写操作不会自动启用，需要后续增加确认或审批流程。
 
 ### 架构
 
@@ -599,7 +753,7 @@ import { useChatStream } from "./chat-widget";
 const { messages, send, isTyping } = useChatStream({ endpoint, userId, threadId });
 ```
 
-Vite 演示页与业务方接入形态一致：右下角悬浮气泡，点击后展开聊天面板。演示使用英文界面，并展示 3 个真实 SSE 问答结果：
+Vite 演示页与你的应用接入形态一致：右下角悬浮气泡，点击后展开聊天面板。演示使用英文界面，并展示 3 个真实 SSE 问答结果：
 
 ![英文 chat-widget 演示](docs/screenshots/chat-widget-en.png)
 
@@ -638,7 +792,7 @@ npm run dev
               │  Headers: Authorization（用户 token）+ X-User-Id
               ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                        业务方 BFF（自家代码）                              │
+│                        你的 BFF（应用代码）                                │
 │  examples/bff/nextjs/route.ts（模板）                                    │
 │  • 读自家 cookie / session                                              │
 │  • 透传 Authorization + X-User-Id + X-Thread-Id 到 agent                  │
@@ -665,7 +819,7 @@ npm run dev
 │   │  ┌───────────────────────────────────────────────────────┐    │    │
 │   │  │ Intent Handlers（skills/ — 5 内置 + 自定义）         │    │    │
 │   │  │  faq        — RAG → 回答                              │    │    │
-│   │  │  account    — ToolRegistry.invoke() → 回答            │    │    │
+│   │  │  account    — Tool-enabled agent → 回答                  │    │    │
 │   │  │  complaint  — LLM 直答（共情 prompt）                 │    │    │
 │   │  │  chat       — LLM 直答（闲聊 prompt）                   │    │    │
 │   │  │  refuse     — 预设话术（不调 LLM）                     │    │    │
@@ -697,10 +851,10 @@ npm run dev
 │   └────────────────────────────────────────────────────────────────┘    │
 │                              │                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │
-│   │                  ToolRegistry（tools/registry.py）             │    │
-│   │  • HTTP 调用（bearer / header:X-Name / none 鉴权）         │    │
-│   │  • 模板渲染（{{user_token}} / {{user_id}} / ...）              │    │
-│   │  • 响应字段提取（如 data.balance）                              │    │
+│   │             LangChain Toolset + ToolRegistry                  │    │
+│   │  • agent/tools/ 中的 @tool 启动时自动发现                    │    │
+│   │  • LLM 选择 Tool → ToolNode 执行 → Graph 循环                 │    │
+│   │  • 旧 ToolRegistry 继续支持固定 API 配置                     │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                              │                                            │
 │   ┌────────────────────────────────────────────────────────────────┐    │
@@ -717,8 +871,8 @@ npm run dev
 │   │  • llm / embedding / vector_store                              │    │
 │   │  • retriever（strategy / fusion / rerank）                    │    │
 │   │  • knowledge.sources[].connector / format / ocr / vision_llm   │    │
-│   │  • tools[]（endpoint / auth / request_template）               │    │
-│   │  • intents[].handler（builtin:xxx | path.py:build）           │    │
+│   │  • tools[]（旧 endpoint / auth / request_template）            │    │
+│   │  • intents[].handler + intents[].toolset                      │    │
 │   │  • server（cors / heartbeat）                                 │    │
 │   │  • langsmith.evaluation（dataset_name / evaluators）           │    │
 │   └────────────────────────────────────────────────────────────────┘    │
@@ -727,13 +881,13 @@ npm run dev
               │                              │
               ▼                              ▼
 ┌──────────────────────────┐   ┌────────────────────────────────────────────┐
-│   LLM Providers（业务方） │   │   可观测（可选）                          │
+│   LLM Providers（你的账号） │   │   可观测（可选）                       │
 │   • OpenAI                │   │   • LangSmith SaaS（client + dataset）     │
 │   • Anthropic             │   │   • 本地 JSONL trace                      │
 │   • DeepSeek              │   │   • LLM-as-judge evaluator                 │
 │   • Ollama（本地）        │   └────────────────────────────────────────────┘
 │   • Azure OpenAI          │
-│   业务方自己 key / 自己付 │    ┌────────────────────────────────────────────┐
+│   由部署者提供 key / 付费 │    ┌────────────────────────────────────────────┐
 └──────────────────────────┘   │   存储（每个 agent 实例）                  │
                               │   • ./data/chroma（向量库）                 │
                               │   • ./data/bm25_chunks.pkl（BM25 chunks）    │
